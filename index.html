@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMDS - Official Gateway</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --primary: #16a34a; --gold: #d4af37; --bg-light: #dcfce7; --card-yellow: #fef3c7; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-light); margin: 0; padding-bottom: 30px; overflow-x: hidden; }
+
+        /* --- Login Section --- */
+        #login-page { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; text-align: center; }
+        
+        .logo-circle { width: 110px; height: 110px; border-radius: 50%; border: 3px solid var(--gold); padding: 5px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 15px; overflow: hidden; }
+        .logo-circle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+        .u-input { width: 100%; max-width: 320px; padding: 16px; margin: 10px 0; border-radius: 12px; border: 1.5px solid #ddd; outline: none; font-size: 16px; }
+        .btn-main { background: var(--primary); color: white; border: 2px solid var(--gold); width: 100%; max-width: 320px; padding: 16px; border-radius: 15px; font-weight: 800; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        .btn-main:active { transform: scale(0.96); }
+
+        /* --- Dashboard --- */
+        #main-dashboard { display: none; animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .header { background: var(--primary); padding: 25px; text-align: center; border-radius: 0 0 35px 35px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header h2 { margin: 0; color: var(--gold); font-weight: 800; text-shadow: 1px 1px #000; letter-spacing: 1px; }
+        
+        .container { padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .order-btn { background: #fff; border: 3.5px solid var(--gold); padding: 20px; border-radius: 25px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 20px; width: 100%; max-width: 400px; box-sizing: border-box; text-decoration: none; color: black; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        
+        .s-card { background: var(--card-yellow); padding: 15px; border-radius: 20px; display: flex; align-items: center; gap: 15px; border: 1px solid #f1f5f9; cursor: pointer; width: 100%; max-width: 400px; margin-bottom: 15px; box-sizing: border-box; }
+        .s-img { width: 55px; height: 55px; border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; border: 1.5px dashed var(--gold); overflow: hidden; }
+        .s-img img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .loc-tag { font-size: 10px; color: white; background: rgba(0,0,0,0.3); padding: 5px 15px; border-radius: 20px; margin-top: 10px; display: inline-block; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <div id="login-page">
+        <div class="logo-circle">
+            <img src="https://i.ibb.co/example/gmds-logo.png" alt="GMDS Logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3703/3703259.png'">
+        </div>
+        <h2 style="color: var(--primary); margin: 0; font-weight: 800;">Welcome to GMDS</h2>
+        <p style="color: #666; font-size: 13px; margin: 10px 0 20px;">Your Trusted Service Partner</p>
+        
+        <input type="text" id="custName" class="u-input" placeholder="Enter Your Full Name">
+        <input type="tel" id="custPhone" class="u-input" placeholder="WhatsApp Number">
+        
+        <button class="btn-main" id="startBtn" onclick="initiateSecureLogin()">START SERVICES</button>
+        <p id="gps-status" style="font-size: 10px; color: #ef4444; margin-top: 15px; font-weight: 800;">📍 Tracking Location...</p>
+    </div>
+
+    <div id="main-dashboard">
+        <div class="header">
+            <h2>GMDS OFFICIAL</h2>
+            <div class="loc-tag" id="loc-badge">🛰️ GPS Active</div>
+        </div>
+
+        <div class="container">
+            <div class="order-btn" onclick="processOrder('WhatsApp Catalog', true)">
+                <div><b>ORDER NOW</b><br><small>View Products & Prices</small></div>
+                <i class="fab fa-whatsapp" style="font-size: 35px; color: #25D366;"></i>
+            </div>
+
+            <div class="s-card" onclick="processOrder('Digital Seba', false)">
+                <div class="s-img"><i class="fas fa-laptop-code" style="color:var(--gold); font-size: 20px;"></i></div>
+                <div class="s-info"><b>Digital Seba</b><p>Pan, Voter & Online Forms</p></div>
+            </div>
+
+            <div class="s-card" onclick="processOrder('Medicine Delivery', false)">
+                <div class="s-img"><i class="fas fa-pills" style="color:var(--gold); font-size: 20px;"></i></div>
+                <div class="s-info"><b>Medicine</b><p>Fast Home Delivery</p></div>
+            </div>
+
+            <div class="s-card" onclick="processOrder('House Help', false)">
+                <div class="s-img"><i class="fas fa-house-user" style="color:var(--gold); font-size: 20px;"></i></div>
+                <div class="s-info"><b>House Help</b><p>Technician & Repairs</p></div>
+            </div>
+
+            <div style="margin-top: 25px;">
+                <a href="https://wa.me/916297474412" style="text-decoration: none; color: var(--primary); font-weight: 800; font-size: 14px;">
+                    <i class="fas fa-headset"></i> Official Support
+                </a>
+            </div>
+        </div>
+    </div>
+
+<script>
+let userLocation = "Location Not Shared";
+const scriptURL = "https://script.google.com/macros/s/AKfycbyEXWdxtVDjStNtXdVc1Vz5oijaflS7XjpDj0zAVynjCjahw6pnTbQuQoWkyxFClp5WCQ/exec";
+
+// 🛰️ Real-time Location Tracking
+function trackGPS() {
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(pos => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            userLocation = `https://www.google.com/maps?q=${lat},${lon}`;
+            document.getElementById('gps-status').innerText = "✅ Location Connected";
+            document.getElementById('gps-status').style.color = "#16a34a";
+            document.getElementById('loc-badge').innerText = "📍 Location Secured";
+        }, err => {
+            console.warn("GPS Tracking Error");
+        }, { enableHighAccuracy: true });
+    }
+}
+
+window.onload = () => {
+    trackGPS();
+    if(localStorage.getItem('gmds_user')) showDashboard();
+};
+
+async function initiateSecureLogin() {
+    const name = document.getElementById('custName').value.trim();
+    const phone = document.getElementById('custPhone').value.trim();
+    
+    if(!name || phone.length < 10) {
+        alert("Enter valid Full Name and Phone Number!");
+        return;
+    }
+
+    // বাটনে লোডিং ইফেক্ট
+    const btn = document.getElementById('startBtn');
+    btn.innerText = "Connecting...";
+    btn.disabled = true;
+
+    localStorage.setItem('gmds_user', name);
+    localStorage.setItem('gmds_phone', phone);
+    
+    // 🛡️ Instant Data Push on Login (Name + Phone + Map Link)
+    await pushDataToSheet(name, phone, "New User Login");
+    
+    showDashboard();
+}
+
+function processOrder(service, isCatalog) {
+    const name = localStorage.getItem('gmds_user');
+    const phone = localStorage.getItem('gmds_phone');
+
+    pushDataToSheet(name, phone, service);
+
+    if(isCatalog) {
+        window.location.href = "https://wa.me/c/916297474412";
+    } else {
+        const msg = `*GMDS NEW REQUEST*%0A*Service:* ${service}%0A*Name:* ${name}%0A*Phone:* ${phone}%0A*Location:* ${userLocation}`;
+        window.location.href = `https://wa.me/916297474412?text=${msg}`;
+    }
+}
+
+async function pushDataToSheet(n, p, s) {
+    try {
+        await fetch(scriptURL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: n, phone: p, service: s, location: userLocation })
+        });
+    } catch (e) {
+        console.error("Sync Error");
+    }
+}
+
+function showDashboard() {
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('main-dashboard').style.display = 'block';
+}
+</script>
+</body>
+</html>
