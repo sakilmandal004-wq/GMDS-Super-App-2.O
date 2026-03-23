@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMDS - Professional Service Gateway</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --primary: #16a34a; --gold: #d4af37; --bg-light: #dcfce7; --card-yellow: #fef3c7; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-light); margin: 0; padding-bottom: 30px; overflow-x: hidden; }
+
+        /* --- Login Section --- */
+        #login-page { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; text-align: center; }
+        
+        .logo-circle { width: 115px; height: 115px; border-radius: 50%; border: 3.5px solid var(--gold); padding: 5px; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.12); margin-bottom: 18px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .logo-circle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+        .u-input { width: 100%; max-width: 320px; padding: 16px; margin: 12px 0; border-radius: 12px; border: 1.5px solid #e2e8f0; outline: none; font-size: 16px; background: #f8fafc; transition: 0.3s; }
+        .u-input:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1); }
+
+        .btn-main { background: var(--primary); color: white; border: 2px solid var(--gold); width: 100%; max-width: 320px; padding: 16px; border-radius: 15px; font-weight: 800; cursor: pointer; font-size: 16px; transition: 0.3s; margin-top: 10px; }
+        .btn-main:active { transform: scale(0.96); }
+        .btn-main:disabled { background: #94a3b8; border-color: #cbd5e1; cursor: not-allowed; }
+
+        /* --- Dashboard Section --- */
+        #main-dashboard { display: none; animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .header { background: var(--primary); padding: 30px; text-align: center; border-radius: 0 0 40px 40px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .header h2 { margin: 0; color: var(--gold); font-weight: 800; text-shadow: 1.5px 1.5px #000; letter-spacing: 1.5px; }
+        
+        .container { padding: 25px 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .order-btn { background: #fff; border: 3.5px solid var(--gold); padding: 22px; border-radius: 25px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 25px; width: 100%; max-width: 400px; box-sizing: border-box; text-decoration: none; color: black; box-shadow: 0 6px 15px rgba(0,0,0,0.06); transition: 0.2s; }
+        .order-btn:active { transform: scale(0.98); }
+        
+        .s-card { background: var(--card-yellow); padding: 18px; border-radius: 22px; display: flex; align-items: center; gap: 15px; border: 1px solid #f1f5f9; cursor: pointer; width: 100%; max-width: 400px; margin-bottom: 15px; box-sizing: border-box; transition: 0.2s; }
+        .s-card:active { transform: scale(0.98); background: #fde68a; }
+
+        .s-img { width: 58px; height: 58px; border-radius: 14px; background: #fff; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--gold); overflow: hidden; }
+        .s-img i { font-size: 24px; color: var(--primary); }
+        
+        .loc-tag { font-size: 11px; color: white; background: rgba(0,0,0,0.3); padding: 6px 16px; border-radius: 20px; margin-top: 12px; display: inline-block; font-weight: 600; }
+        
+        .support-link { margin-top: 30px; text-decoration: none; color: var(--primary); font-weight: 800; font-size: 14px; transition: 0.3s; }
+    </style>
+</head>
+<body>
+
+    <div id="login-page">
+        <div class="logo-circle">
+            <img src="logo.png" alt="GMDS Logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3703/3703259.png'">
+        </div>
+        <h2 style="color: var(--primary); margin: 0; font-weight: 800;">Welcome to GMDS</h2>
+        <p style="color: #64748b; font-size: 13px; margin: 8px 0 22px; font-weight: 500;">Your Trusted Multi-Service Partner</p>
+        
+        <input type="text" id="custName" class="u-input" placeholder="Full Name">
+        <input type="tel" id="custPhone" class="u-input" placeholder="WhatsApp Number">
+        
+        <button class="btn-main" id="startBtn" onclick="initiateSecureLogin()">START SERVICES</button>
+        <p id="gps-status" style="font-size: 11px; color: #ef4444; margin-top: 18px; font-weight: 800;">📍 Initializing Location...</p>
+    </div>
+
+    <div id="main-dashboard">
+        <div class="header">
+            <h2>GMDS OFFICIAL</h2>
+            <div class="loc-tag" id="loc-badge">🛰️ Fetching Live GPS...</div>
+        </div>
+
+        <div class="container">
+            <div class="order-btn" onclick="processOrder('WhatsApp Catalog Visit', true)">
+                <div><b>ORDER NOW</b><br><small>Browse Products & Prices</small></div>
+                <i class="fab fa-whatsapp" style="font-size: 38px; color: #25D366;"></i>
+            </div>
+
+            <div class="s-card" onclick="processOrder('Digital Seba', false)">
+                <div class="s-img"><i class="fas fa-laptop-code"></i></div>
+                <div class="s-info"><b>Digital Seba</b><p>Pan, Voter & Online Forms</p></div>
+            </div>
+
+            <div class="s-card" onclick="processOrder('Medicine Delivery', false)">
+                <div class="s-img"><i class="fas fa-hand-holding-medical"></i></div>
+                <div class="s-info"><b>Medicine</b><p>Fast Home Delivery</p></div>
+            </div>
+
+            <div class="s-card" onclick="processOrder('House Help', false)">
+                <div class="s-img"><i class="fas fa-house-user"></i></div>
+                <div class="s-info"><b>House Help</b><p>Technician & Repairs</p></div>
+            </div>
+
+            <a href="https://wa.me/916297474412" class="support-link">
+                <i class="fas fa-headset"></i> Official Support Center
+            </a>
+        </div>
+    </div>
+
+<script>
+let userLocation = "Searching...";
+const scriptURL = "https://script.google.com/macros/s/AKfycbyEXWdxtVDjStNtXdVc1Vz5oijaflS7XjpDj0zAVynjCjahw6pnTbQuQoWkyxFClp5WCQ/exec";
+
+// 🛰️ Real-time High Accuracy Location Tracking
+function trackGPS() {
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(pos => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            userLocation = `https://www.google.com/maps?q=${lat},${lon}`;
+            
+            const statusLabel = document.getElementById('gps-status');
+            statusLabel.innerText = "✅ Location Connected";
+            statusLabel.style.color = "#16a34a";
+            
+            document.getElementById('loc-badge').innerText = "📍 GPS Signal Secured";
+        }, err => {
+            userLocation = "Location Access Denied";
+        }, { enableHighAccuracy: true });
+    }
+}
+
+window.onload = () => {
+    trackGPS();
+    if(localStorage.getItem('gmds_user')) showDashboard();
+};
+
+async function initiateSecureLogin() {
+    const name = document.getElementById('custName').value.trim();
+    const phone = document.getElementById('custPhone').value.trim();
+    
+    if(!name || phone.length < 10) {
+        alert("Please enter a valid Name and 10-digit Phone Number!");
+        return;
+    }
+
+    const btn = document.getElementById('startBtn');
+    btn.innerText = "Connecting Securely...";
+    btn.disabled = true;
+
+    localStorage.setItem('gmds_user', name);
+    localStorage.setItem('gmds_phone', phone);
+    
+    // Instant Background Sync to Google Sheets
+    await pushDataToSheet(name, phone, "User Gateway Entry");
+    
+    // Smooth transition to Dashboard
+    setTimeout(() => {
+        showDashboard();
+    }, 800);
+}
+
+function processOrder(service, isCatalog) {
+    const name = localStorage.getItem('gmds_user');
+    const phone = localStorage.getItem('gmds_phone');
+
+    pushDataToSheet(name, phone, service);
+
+    if(isCatalog) {
+        window.location.href = "https://wa.me/c/916297474412";
+    } else {
+        const msg = `*GMDS NEW REQUEST*%0A*Service:* ${service}%0A*Name:* ${name}%0A*Phone:* ${phone}%0A*Location:* ${userLocation}`;
+        window.location.href = `https://wa.me/916297474412?text=${msg}`;
+    }
+}
+
+async function pushDataToSheet(n, p, s) {
+    try {
+        await fetch(scriptURL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: n, phone: p, service: s, location: userLocation })
+        });
+    } catch (e) {
+        console.error("Transmission Error");
+    }
+}
+
+function showDashboard() {
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('main-dashboard').style.display = 'block';
+}
+</script>
+</body>
+</html>
