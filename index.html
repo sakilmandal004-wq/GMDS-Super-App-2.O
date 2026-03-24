@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMDS - Official Gateway</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --primary: #16a34a; --gold: #d4af37; --bg-light: #dcfce7; --card-yellow: #fef3c7; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-light); margin: 0; padding-bottom: 30px; overflow-x: hidden; }
+
+        /* --- Login Section --- */
+        #login-page { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; text-align: center; }
+        .logo-circle { width: 115px; height: 115px; border-radius: 50%; border: 3.5px solid var(--gold); padding: 5px; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.12); margin-bottom: 18px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .logo-circle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+        .u-input { width: 100%; max-width: 320px; padding: 16px; margin: 12px 0; border-radius: 12px; border: 1.5px solid #e2e8f0; outline: none; font-size: 16px; background: #f8fafc; transition: 0.3s; }
+        
+        .loc-btn { background: #fff4f4; color: #dc2626; border: 2px dashed #dc2626; width: 100%; max-width: 320px; padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: 0.3s; }
+
+        .btn-main { background: var(--primary); color: white; border: 2px solid var(--gold); width: 100%; max-width: 320px; padding: 16px; border-radius: 15px; font-weight: 800; cursor: pointer; font-size: 16px; transition: 0.3s; margin-top: 10px; opacity: 0.5; pointer-events: none; }
+        .btn-main.active { opacity: 1; pointer-events: auto; }
+
+        /* --- Dashboard Section --- */
+        #main-dashboard { display: none; animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .header { background: var(--primary); padding: 30px; text-align: center; border-radius: 0 0 40px 40px; }
+        .header h2 { margin: 0; color: var(--gold); font-weight: 800; text-shadow: 1.5px 1.5px #000; letter-spacing: 1.5px; }
+        
+        .container { padding: 25px 20px; display: flex; flex-direction: column; align-items: center; }
+        .order-btn { background: #fff; border: 3.5px solid var(--gold); padding: 22px; border-radius: 25px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 25px; width: 100%; max-width: 400px; box-sizing: border-box; text-decoration: none; color: black; box-shadow: 0 6px 15px rgba(0,0,0,0.06); }
+        .s-card { background: var(--card-yellow); padding: 18px; border-radius: 22px; display: flex; align-items: center; gap: 15px; border: 1px solid #f1f5f9; cursor: pointer; width: 100%; max-width: 400px; margin-bottom: 15px; box-sizing: border-box; }
+        .s-img i { font-size: 24px; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div id="login-page">
+        <div class="logo-circle">
+            <img src="logo.png" alt="GMDS Logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3703/3703259.png'">
+        </div>
+        <h2 style="color: var(--primary); margin: 0; font-weight: 800;">Welcome to GMDS</h2>
+        <p style="color: #64748b; font-size: 13px; margin: 8px 0 22px; font-weight: 500;">Secure Multi-Service Gateway</p>
+        
+        <input type="text" id="custName" class="u-input" placeholder="Full Name">
+        <input type="tel" id="custPhone" class="u-input" placeholder="WhatsApp Number">
+        
+        <button class="loc-btn" id="locPermissionBtn" onclick="getGPS()">📍 ENABLE LOCATION ACCESS</button>
+
+        <button class="btn-main" id="startBtn" onclick="finalizeLogin()">START SERVICES</button>
+        <p id="gps-status" style="font-size: 11px; color: #ef4444; margin-top: 18px; font-weight: 800;">⚠️ Location permission required to login</p>
+    </div>
+
+    <div id="main-dashboard">
+        
+        <div class="map-trigger" onclick="openLocModal()" style="position: absolute; top: 20px; left: 20px; width: 45px; height: 45px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1001; cursor: pointer; border: 2.5px solid #d4af37;">
+            <i class="fas fa-map-marker-alt" style="color: #ef4444; font-size: 22px;"></i>
+        </div>
+
+        <div class="header">
+            <h2>GMDS OFFICIAL</h2>
+        </div>
+
+        <div class="container">
+            <div class="order-btn" onclick="processOrder('WhatsApp Catalog Visit', true)">
+                <div><b>ORDER NOW</b><br><small>Browse Products & Prices</small></div>
+                <i class="fab fa-whatsapp" style="font-size: 38px; color: #25D366;"></i>
+            </div>
+
+            <div class="s-card" onclick="processOrder('Digital Seba', false)">
+                <div class="s-img"><i class="fas fa-laptop-code"></i></div>
+                <div class="s-info"><b>Digital Seba</b><p>Online Forms & Services</p></div>
+            </div>
+
+            <div class="s-card" onclick="processOrder('Medicine Delivery', false)">
+                <div class="s-img"><i class="fas fa-hand-holding-medical"></i></div>
+                <div class="s-info"><b>Medicine</b><p>Fast Home Delivery</p></div>
+            </div>
+
+            <div class="s-card" onclick="processOrder('House Help', false)">
+                <div class="s-img"><i class="fas fa-house-user"></i></div>
+                <div class="s-info"><b>House Help</b><p>Technician & Repairs</p></div>
+            </div>
+
+            <a href="https://wa.me/916297474412" style="margin-top: 30px; text-decoration: none; color: var(--primary); font-weight: 800; font-size: 14px;">
+                <i class="fas fa-headset"></i> Official Support Center
+            </a>
+        </div>
+    </div>
+
+    <div id="loc-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:10000; align-items:center; justify-content:center; padding:20px; backdrop-filter: blur(4px);">
+        <div style="background:white; width:100%; max-width:340px; border-radius:25px; padding:30px; text-align:center;">
+            <i class="fas fa-location-arrow" style="font-size:50px; color:#ef4444; margin-bottom:15px;"></i>
+            <h3 style="margin:0; color:#1e293b; font-weight:800;">Location Update</h3>
+            <p style="font-size:13px; color:#64748b; margin:10px 0 20px; font-weight:600;">Click the button below to send your accurate live location to our system.</p>
+            
+            <button onclick="reSyncLocation()" style="background:#16a34a; color:white; border:none; width:100%; padding:16px; border-radius:12px; font-weight:800; cursor:pointer;">
+                ✅ SEND LIVE LOCATION
+            </button>
+            
+            <button onclick="closeLocModal()" style="background:none; border:none; color:#ef4444; margin-top:15px; font-weight:700; cursor:pointer;">CLOSE</button>
+        </div>
+    </div>
+
+<script>
+let finalUserLocation = "";
+const scriptURL = "https://script.google.com/macros/s/AKfycbyEXWdxtVDjStNtXdVc1Vz5oijaflS7XjpDj0zAVynjCjahw6pnTbQuQoWkyxFClp5WCQ/exec";
+
+// Popup Controls
+function openLocModal() { document.getElementById('loc-modal').style.display = 'flex'; }
+function closeLocModal() { document.getElementById('loc-modal').style.display = 'none'; }
+
+// Live Location Sync & Push to Sheet
+function reSyncLocation() {
+    const btn = document.querySelector('#loc-modal button');
+    btn.innerHTML = '⌛ SENDING LINK...';
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            
+            // Generate direct tracking link
+            const liveMapLink = `https://www.google.com/maps?q=${lat},${lon}`;
+            
+            const name = localStorage.getItem('gmds_user');
+            const phone = localStorage.getItem('gmds_phone');
+
+            // Push data directly to Google Sheet
+            fetch(scriptURL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({
+                    name: name,
+                    phone: phone,
+                    service: "LIVE TRACKING UPDATE",
+                    location: liveMapLink
+                })
+            });
+
+            setTimeout(() => {
+                closeLocModal();
+                btn.innerHTML = '✅ SEND LIVE LOCATION';
+                alert("Your live map link has been sent to our system!");
+            }, 1000);
+
+        }, (err) => {
+            alert("Please enable GPS/Location access!");
+            closeLocModal();
+        }, { enableHighAccuracy: true });
+    }
+}
+
+function getGPS() {
+    const locBtn = document.getElementById('locPermissionBtn');
+    const startBtn = document.getElementById('startBtn');
+    const statusText = document.getElementById('gps-status');
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                finalUserLocation = `https://www.google.com/maps?q=${lat},${lon}`;
+                
+                locBtn.innerText = "✅ LOCATION SECURED";
+                locBtn.style.background = "#f0fdf4";
+                locBtn.style.color = "#16a34a";
+                locBtn.style.borderColor = "#16a34a";
+                
+                statusText.innerText = "✅ Location Verified!";
+                statusText.style.color = "#16a34a";
+
+                startBtn.classList.add('active');
+                startBtn.disabled = false;
+            },
+            (err) => {
+                alert("Please click 'Allow' on the permission prompt to proceed.");
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    } else {
+        alert("GPS is not supported on this device.");
+    }
+}
+
+async function finalizeLogin() {
+    const name = document.getElementById('custName').value.trim();
+    const phone = document.getElementById('custPhone').value.trim();
+    
+    if(!name || phone.length < 10) {
+        alert("Please enter Name and 10-digit Phone Number!");
+        return;
+    }
+
+    localStorage.setItem('gmds_user', name);
+    localStorage.setItem('gmds_phone', phone);
+    
+    pushData(name, phone, "User Gateway Entry");
+    
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('main-dashboard').style.display = 'block';
+}
+
+function processOrder(service, isCatalog) {
+    const name = localStorage.getItem('gmds_user');
+    const phone = localStorage.getItem('gmds_phone');
+    pushData(name, phone, service);
+
+    if(isCatalog) window.location.href = "https://wa.me/c/916297474412";
+    else window.location.href = `https://wa.me/916297474412?text=*GMDS REQUEST*%0A*Service:* ${service}%0A*Customer:* ${name}%0A*Location:* ${finalUserLocation}`;
+}
+
+async function pushData(n, p, s) {
+    try {
+        fetch(scriptURL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: n, phone: p, service: s, location: finalUserLocation })
+        });
+    } catch (e) { console.log("Sync Error"); }
+}
+
+// Automatic live location tracking every 25 seconds
+setInterval(() => {
+    if (navigator.geolocation && localStorage.getItem('gmds_user')) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            finalUserLocation = `https://www.google.com/maps?q=${lat},${lon}`;
+
+            const name = localStorage.getItem('gmds_user');
+            const phone = localStorage.getItem('gmds_phone');
+            pushData(name, phone, "Background Live Update");
+        }, null, { enableHighAccuracy: true });
+    }
+}, 25000); 
+
+window.onload = () => {
+    if(localStorage.getItem('gmds_user')) {
+        document.getElementById('login-page').style.display = 'none';
+        document.getElementById('main-dashboard').style.display = 'block';
+    }
+};
+</script>
+</body>
+</html>
