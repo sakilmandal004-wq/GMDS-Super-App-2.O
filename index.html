@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMDS - Official Secure Gateway</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --primary: #16a34a; --gold: #d4af37; --bg-light: #dcfce7; --card-yellow: #fef3c7; --danger: #dc2626; --blue: #2563eb; }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-light); margin: 0; padding-bottom: 30px; overflow-x: hidden; }
+
+        /* --- Language Selection Screen --- */
+        #language-screen { position: fixed; inset: 0; background: white; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; text-align: center; }
+
+        /* --- Login Section --- */
+        #login-page { position: fixed; inset: 0; background: white; z-index: 9998; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; text-align: center; }
+        .logo-circle { width: 115px; height: 115px; border-radius: 50%; border: 3.5px solid var(--gold); padding: 5px; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.12); margin-bottom: 18px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .logo-circle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+        .u-input { width: 100%; max-width: 320px; padding: 16px; margin: 12px 0; border-radius: 12px; border: 1.5px solid #e2e8f0; outline: none; font-size: 16px; background: #f8fafc; transition: 0.3s; }
+        .loc-btn { background: #fff4f4; color: #dc2626; border: 2px dashed #dc2626; width: 100%; max-width: 320px; padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: 0.3s; }
+        .btn-main { background: var(--primary); color: white; border: 2px solid var(--gold); width: 100%; max-width: 320px; padding: 16px; border-radius: 15px; font-weight: 800; cursor: pointer; font-size: 16px; transition: 0.3s; margin-top: 10px; opacity: 0.5; pointer-events: none; }
+        .btn-main.active { opacity: 1; pointer-events: auto; }
+
+        /* --- Dashboard --- */
+        #main-dashboard { display: none; animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .header { background: var(--primary); padding: 30px; text-align: center; border-radius: 0 0 40px 40px; }
+        .header h2 { margin: 0; color: var(--gold); font-weight: 800; text-shadow: 1.5px 1.5px #000; letter-spacing: 1.5px; }
+        .container { padding: 25px 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .order-btn { background: #fff; border: 3.5px solid var(--gold); padding: 22px; border-radius: 25px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 20px; width: 100%; max-width: 400px; box-sizing: border-box; text-decoration: none; color: black; box-shadow: 0 6px 15px rgba(0,0,0,0.06); }
+        .action-row { display: flex; gap: 10px; width: 100%; max-width: 400px; margin-bottom: 25px; }
+        .quick-btn { flex: 1; background: var(--blue); color: white; padding: 15px; border-radius: 15px; border: none; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
+        .logout-btn { flex: 1; background: var(--danger); color: white; padding: 15px; border-radius: 15px; border: none; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2); }
+
+        .s-card { background: var(--card-yellow); padding: 18px; border-radius: 22px; display: flex; align-items: center; gap: 15px; border: 1px solid #f1f5f9; cursor: pointer; width: 100%; max-width: 400px; margin-bottom: 15px; box-sizing: border-box; }
+        .s-img i { font-size: 24px; color: var(--primary); }
+        .s-info b { font-size: 16px; color: #1e293b; }
+        .s-info p { font-size: 12px; color: #64748b; margin: 2px 0 0; }
+
+        /* --- Modals --- */
+        #seba-modal, #loc-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:99999; align-items:flex-end; justify-content:center; backdrop-filter: blur(6px); }
+        .seba-content, .modal-content { background:#fff; width:100%; max-width:450px; border-radius:30px 30px 0 0; padding:25px; box-shadow: 0 -10px 30px rgba(0,0,0,0.3); animation: gmdsSlideUp 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
+        @keyframes gmdsSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .seba-header { font-weight:800; color:#1e293b; text-align:center; margin-bottom:20px; font-size:18px; border-bottom: 2px solid #f1f5f9; padding-bottom:12px; }
+        .cat-container { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:20px; }
+        .cat-btn { padding:15px 5px; border-radius:18px; border:2.5px solid #f1f5f9; background:#fff; cursor:pointer; text-align:center; transition:0.3s; font-weight:700; font-size:11px; color:#64748b; }
+        .cat-btn i { font-size:22px; margin-bottom:8px; display:block; }
+        .cat-btn.active { border-color:var(--primary); background:#f0fdf4; color:var(--primary); transform: scale(1.02); }
+
+        .task-list { display:none; max-height:280px; overflow-y:auto; background:#f8fafc; border-radius:20px; padding:10px; margin-bottom:20px; border: 1px solid #e2e8f0; }
+        .task-item { display:flex; align-items:center; justify-content:space-between; padding:15px; border-bottom:1px solid #edf2f7; cursor:pointer; transition:0.2s; border-radius:12px; margin-bottom:5px; }
+        .task-info { display:flex; align-items:center; gap:12px; font-size:14px; font-weight:600; color:#334155; }
+        .task-item i { color:var(--primary); font-size:18px; }
+
+        .confirm-btn { background:var(--primary); color:white; border:none; width:100%; padding:18px; border-radius:20px; font-weight:800; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; box-shadow: 0 5px 15px rgba(22,163,74,0.3); }
+
+        /* --- Landmark Box --- */
+        .location-card { background: #f0fdf4; border-radius: 20px; padding: 25px; border: 2.5px solid #bbf7d0; text-align: left; margin-bottom: 20px; }
+        .landmark-box { margin-top: 15px; position: relative; }
+        .landmark-box i { position: absolute; left: 15px; top: 18px; color: var(--primary); }
+        .landmark-input { width: 100%; padding: 16px 16px 16px 45px; border: 2px solid #cbd5e1; border-radius: 15px; font-size: 15px; outline: none; box-sizing: border-box; background: #ffffff; color: #1e293b; transition: 0.3s; font-family: 'Poppins', sans-serif; font-weight: 600; }
+        .landmark-input:focus { border-color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div id="language-screen">
+        <div class="logo-circle"><img src="logo.png" alt="GMDS Logo"></div>
+        <h2 style="color: var(--primary); margin-bottom: 30px; font-weight: 800;">Select Your Language</h2>
+        <button class="u-input" onclick="setAppLanguage('bn')" style="background: var(--primary); color: white; font-weight: 800; border: none;">বাংলা (BENGALI)</button>
+        <button class="u-input" onclick="setAppLanguage('en')" style="background: var(--blue); color: white; font-weight: 800; border: none; margin-top: 15px;">ENGLISH</button>
+        <p style="font-size: 12px; color: #64748b; margin-top: 20px;">Please select a language to continue</p>
+    </div>
+
+    <div id="login-page">
+        <div class="logo-circle"><img src="logo.png" alt="GMDS Logo"></div>
+        <h2 style="color: var(--primary); margin: 0; font-weight: 800;">Welcome to GMDS</h2>
+        <input type="text" id="custName" class="u-input" placeholder="Enter Your Name">
+        <input type="tel" id="custPhone" class="u-input" placeholder="WhatsApp Number">
+        <button class="loc-btn" id="locPermissionBtn" onclick="getGPS()">
+            <i class="fas fa-location-crosshairs"></i> ENABLE LOCATION ACCESS
+        </button>
+        <button class="btn-main" id="startBtn" onclick="finalizeLogin()">START SERVICES</button>
+        <p id="gps-status" style="font-size: 11px; color: #ef4444; margin-top: 18px; font-weight: 800;">
+            <i class="fas fa-circle-exclamation"></i> GPS permission required to login
+        </p>
+    </div>
+
+    <div id="main-dashboard">
+        <div class="map-trigger" onclick="openLocModal()" style="position: absolute; top: 20px; left: 20px; width: 45px; height: 45px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1001; cursor: pointer; border: 2.5px solid var(--gold);">
+            <i class="fas fa-map-location-dot" style="color: #ef4444; font-size: 22px;"></i>
+        </div>
+        <div class="header"><h2>GMDS OFFICIAL</h2></div>
+        
+        <div class="container">
+            <div class="order-btn" onclick="processOrder('Food Order', true)">
+                <div><b class="lang-food">FOOD ORDER NOW</b><br><small>Browse Menu & Prices</small></div>
+                <i class="fas fa-utensils" style="font-size: 32px; color: var(--primary);"></i>
+            </div>
+
+            <div class="action-row">
+                <button class="quick-btn lang-quick" onclick="processOrder('Quick Delivery', false)">
+                    <i class="fas fa-bolt-lightning"></i> Quick Delivery
+                </button>
+                <button class="logout-btn" onclick="userLogout()">
+                    <i class="fas fa-power-off"></i> Logout
+                </button>
+            </div>
+
+            <div class="s-card" onclick="openSebaModal()">
+                <div class="s-img"><i class="fas fa-laptop-code"></i></div>
+                <div class="s-info"><b class="lang-seba">Digital Seba</b><p>Online Forms & Services</p></div>
+            </div>
+
+            <div class="s-card" onclick="processOrder('Medicine Delivery', false)">
+                <div class="s-img"><i class="fas fa-hand-holding-medical"></i></div>
+                <div class="s-info"><b class="lang-med">Medicine</b><p>Fast Home Delivery</p></div>
+            </div>
+
+            <div class="s-card" onclick="processOrder('House Help', false)">
+                <div class="s-img"><i class="fas fa-house-user"></i></div>
+                <div class="s-info"><b class="lang-house">House Help</b><p>Technician Repairs</p></div>
+            </div>
+
+            <a href="https://wa.me/916297474412" style="margin-top: 30px; text-decoration: none; color: var(--primary); font-weight: 800; font-size: 14px;">
+                <i class="fas fa-headset"></i> Official Support Center
+            </a>
+        </div>
+    </div>
+
+    <div id="seba-modal" onclick="event.target == this ? closeSebaModal() : null">
+        <div class="seba-content" onclick="event.stopPropagation()">
+            <div class="seba-header lang-seba-title">GMDS Digital Center</div>
+            <div class="cat-container">
+                <div class="cat-btn" onclick="openCat('pan', this)"><i class="fas fa-id-card"></i><span class="lang-pan-cat">PAN CARD</span></div>
+                <div class="cat-btn" onclick="openCat('voter', this)"><i class="fas fa-address-card"></i><span class="lang-voter-cat">VOTER ID</span></div>
+                <div class="cat-btn" onclick="openCat('ration', this)"><i class="fas fa-bowl-rice"></i><span class="lang-ration-cat">RATION</span></div>
+            </div>
+            <div id="box-pan" class="task-list"></div>
+            <div id="box-voter" class="task-list"></div>
+            <div id="box-ration" class="task-list"></div>
+            <button class="confirm-btn" onclick="sendSebaOrder()">
+                <span id="selected-label">Select Service First</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="loc-modal" onclick="event.target == this ? closeLocModal() : null">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h3 style="margin:0 0 15px; color:#1e293b; font-weight:800; font-size: 22px;">Location Sync</h3>
+            <div class="location-card">
+                <div style="font-size: 14px; color: var(--primary); font-weight: 700; margin-bottom: 5px;">📍 Detected Village:</div>
+                <div id="v-name" style="font-size: 18px; font-weight: 800; color: #1e293b; margin-bottom: 15px;">Detecting...</div>
+                <div class="landmark-box">
+                    <i class="fas fa-house-chimney"></i>
+                    <input type="text" id="custLandmark" class="landmark-input" placeholder="পাড়ার নাম বা ল্যান্ডমার্ক লিখুন">
+                </div>
+            </div>
+            <button onclick="closeLocModal()" class="confirm-btn">SAVE & PROCEED</button>
+        </div>
+    </div>
+
+<script>
+const scriptURL = "https://script.google.com/macros/s/AKfycbyEXWdxtVDjStNtXdVc1Vz5oijaflS7XjpDj0zAVynjCjahw6pnTbQuQoWkyxFClp5WCQ/exec";
+let finalUserLocation = "";
+let autoDetectedVillage = "Unknown";
+let finalSebaTask = "";
+
+const digitalTasks = {
+    'bn': {
+        'pan': ["নতুন প্যান কার্ড", "প্যান কার্ড ভুল সংশোধন", "প্যান কার্ড পিভিসি", "হারিয়ে যাওয়া প্যান কার্ড", "প্যান সংগে মোবাইল নম্বর লিঙ্ক"],
+        'voter': ["নতুন ভোটার কার্ড", "ভোটার কার্ড ভুল সংশোধন", "ভোটার কার্ড মোবাইল নম্বর লিঙ্ক", "ভোটার পিভিসি কার্ড"],
+        'ration': ["নতুন রেশন কার্ড", "রেশন কার্ড ভুল সংশোধন", "রেশন পিভিসি কার্ড", "রেশন কার্ড kyc করা", "রেশন কার্ড মোবাইল নম্বর লিঙ্ক", "রেশন কার্ড পরিবার ভাগ করা"]
+    },
+    'en': {
+        'pan': ["New PAN Card", "PAN Correction", "PAN PVC Card", "Lost PAN Recovery", "PAN Mobile Link"],
+        'voter': ["New Voter Card", "Voter Correction", "Voter Mobile Link", "Voter PVC Card"],
+        'ration': ["New Ration Card", "Ration Correction", "Ration PVC Card", "Ration KYC Update", "Ration Mobile Link", "Ration Family Separation"]
+    }
+};
+
+const translations = {
+    'bn': {
+        welcome: "GMDS-এ স্বাগতম", name_placeholder: "আপনার নাম লিখুন", phone_placeholder: "WhatsApp নম্বর",
+        loc_btn: "লোকেশন পারমিশন দিন", start_btn: "সেবা শুরু করুন", food: "খাবার অর্ডার", med: "ঔষধ ডেলিভারি",
+        seba: "ডিজিটাল সেবা", quick: "দ্রুত ডেলিভারি", house: "বাড়ি ঘর মেরামত", seba_title: "GMDS ডিজিটাল সেন্টার",
+        pan_cat: "প্যান কার্ড", voter_cat: "ভোটার কার্ড", ration_cat: "রেশন কার্ড", landmark_ph: "পাড়ার নাম বা ল্যান্ডমার্ক লিখুন"
+    },
+    'en': {
+        welcome: "Welcome to GMDS", name_placeholder: "Enter Your Name", phone_placeholder: "WhatsApp Number",
+        loc_btn: "Enable Location Access", start_btn: "Start Services", food: "Food Order", med: "Medicine Delivery",
+        seba: "Digital Seba", quick: "Quick Delivery", house: "House Help", seba_title: "GMDS Digital Center",
+        pan_cat: "PAN CARD", voter_cat: "VOTER ID", ration_cat: "RATION CARD", landmark_ph: "Enter Neighborhood/Landmark"
+    }
+};
+
+const adminBridge = {
+    "খাবার অর্ডার": "Food Order", "Food Order": "Food Order",
+    "ঔষধ ডেলিভারি": "Medicine Delivery", "Medicine Delivery": "Medicine Delivery",
+    "ডিজিটাল সেবা": "Digital Seba", "Digital Seba": "Digital Seba",
+    "নতুন প্যান কার্ড": "New PAN Card", "প্যান কার্ড ভুল সংশোধন": "PAN Correction", "প্যান কার্ড পিভিসি": "PAN PVC Card",
+    "হারিয়ে যাওয়া প্যান কার্ড": "Lost PAN Recovery", "প্যান সংগে মোবাইল নম্বর লিঙ্ক": "PAN Mobile Link",
+    "নতুন ভোটার কার্ড": "New Voter Card", "ভোটার কার্ড ভুল সংশোধন": "Voter Correction",
+    "ভোটার কার্ড মোবাইল নম্বর লিঙ্ক": "Voter Mobile Link", "ভোটার পিভিসি কার্ড": "Voter PVC Card",
+    "নতুন রেশন কার্ড": "New Ration Card", "রেশন কার্ড ভুল সংশোধন": "Ration Correction",
+    "রেশন পিভিসি কার্ড": "Ration PVC Card", "রেশন কার্ড kyc করা": "Ration KYC",
+    "রেশন কার্ড মোবাইল নম্বর লিঙ্ক": "Ration Mobile Link", "রেশন কার্ড পরিবার ভাগ করা": "Family Separation"
+};
+
+function setAppLanguage(lang) { localStorage.setItem('gmds_lang', lang); document.getElementById('language-screen').style.display = 'none'; applyTranslations(lang); }
+
+function applyTranslations(lang) {
+    const t = translations[lang];
+    document.querySelector('#login-page h2').innerText = t.welcome;
+    document.getElementById('custName').placeholder = t.name_placeholder;
+    document.getElementById('custPhone').placeholder = t.phone_placeholder;
+    document.getElementById('locPermissionBtn').innerHTML = `<i class="fas fa-location-crosshairs"></i> ${t.loc_btn}`;
+    document.getElementById('startBtn').innerText = t.start_btn;
+    document.querySelector('.lang-food').innerText = t.food;
+    document.querySelector('.lang-med').innerText = t.med;
+    document.querySelector('.lang-seba').innerText = t.seba;
+    document.querySelector('.lang-house').innerText = t.house;
+    document.querySelector('.lang-quick').innerHTML = `<i class="fas fa-bolt-lightning"></i> ${t.quick}`;
+    document.querySelector('.lang-seba-title').innerText = t.seba_title;
+    document.querySelector('.lang-pan-cat').innerText = t.pan_cat;
+    document.querySelector('.lang-voter-cat').innerText = t.voter_cat;
+    document.querySelector('.lang-ration-cat').innerText = t.ration_cat;
+    document.getElementById('custLandmark').placeholder = t.landmark_ph;
+    renderTasks(lang);
+}
+
+function renderTasks(lang) {
+    ['pan', 'voter', 'ration'].forEach(cat => {
+        const box = document.getElementById('box-' + cat);
+        box.innerHTML = digitalTasks[lang][cat].map(task => `
+            <div class="task-item" onclick="setTask('${task}')">
+                <div class="task-info"><i class="fas fa-circle-check"></i> ${task}</div>
+            </div>
+        `).join('');
+    });
+}
+
+function openSebaModal() { document.getElementById('seba-modal').style.display = 'flex'; openCat('pan', document.querySelector('.cat-btn')); }
+function closeSebaModal() { document.getElementById('seba-modal').style.display = 'none'; }
+function openCat(type, btn) { document.querySelectorAll('.task-list').forEach(l => l.style.display = 'none'); document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active')); document.getElementById('box-' + type).style.display = 'block'; btn.classList.add('active'); }
+function setTask(taskName) { finalSebaTask = taskName; document.getElementById('selected-label').innerText = (localStorage.getItem('gmds_lang') === 'bn' ? "কনফার্ম করুন: " : "CONFIRM: ") + taskName; }
+
+function sendSebaOrder() {
+    if(!finalSebaTask) return alert("Select Service!");
+    const n = localStorage.getItem('gmds_user'); const p = localStorage.getItem('gmds_phone');
+    const landmark = document.getElementById('custLandmark').value || "N/A";
+    const adminTask = adminBridge[finalSebaTask] || finalSebaTask;
+    pushData(n, p, "Digital Seba: " + adminTask);
+    const msg = encodeURIComponent(`*GMDS DIGITAL SEBA*\n*Service:* ${adminTask}\n*Customer:* ${n}\n*Loc:* ${finalUserLocation}\n*Landmark:* ${landmark}`);
+    window.location.href = `https://wa.me/916297474412?text=${msg}`;
+}
+
+async function fetchVillageName(lat, lon) {
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+        const data = await res.json();
+        autoDetectedVillage = data.address.village || data.address.suburb || "Local Area";
+        document.getElementById('v-name').innerText = autoDetectedVillage;
+        localStorage.setItem('gmds_village', autoDetectedVillage);
+    } catch (e) {}
+}
+
+function getGPS() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const lat = pos.coords.latitude; const lon = pos.coords.longitude;
+            finalUserLocation = `https://www.google.com/maps?q=${lat},${lon}`;
+            fetchVillageName(lat, lon);
+            const btn = document.getElementById('locPermissionBtn');
+            btn.innerHTML = '<i class="fas fa-check-circle"></i> LOCATION SECURED';
+            btn.style.background = "#f0fdf4"; btn.style.color = "#16a34a";
+            document.getElementById('startBtn').classList.add('active');
+        }, null, {enableHighAccuracy:true});
+    }
+}
+
+function finalizeLogin() {
+    const n = document.getElementById('custName').value; const p = document.getElementById('custPhone').value;
+    if(n && p.length >= 10) {
+        localStorage.setItem('gmds_user', n); localStorage.setItem('gmds_phone', p);
+        document.getElementById('login-page').style.display = 'none';
+        document.getElementById('main-dashboard').style.display = 'block';
+        pushData(n, p, "Gateway Entry");
+    } else { alert("Enter Name & Phone"); }
+}
+
+function processOrder(s, isCatalog) {
+    const n = localStorage.getItem('gmds_user'); const p = localStorage.getItem('gmds_phone');
+    const adminS = adminBridge[s] || s;
+    const landmark = document.getElementById('custLandmark').value || "N/A";
+    pushData(n, p, adminS);
+    if(isCatalog) window.location.href = "https://wa.me/c/916297474412";
+    else {
+        const msg = encodeURIComponent(`*GMDS ORDER*\n*Service:* ${adminS}\n*Customer:* ${n}\n*Loc:* ${finalUserLocation}\n*Landmark:* ${landmark}`);
+        window.location.href = `https://wa.me/916297474412?text=${msg}`;
+    }
+}
+
+async function pushData(n, p, s) { try { fetch(scriptURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ name: n, phone: p, service: s, location: finalUserLocation }) }); } catch (e) {} }
+function userLogout() { if(confirm("Logout?")) { localStorage.clear(); window.location.reload(); } }
+function openLocModal() { document.getElementById('loc-modal').style.display = 'flex'; }
+function closeLocModal() { localStorage.setItem('gmds_landmark', document.getElementById('custLandmark').value); document.getElementById('loc-modal').style.display = 'none'; }
+
+window.addEventListener('DOMContentLoaded', () => {
+    const savedLang = localStorage.getItem('gmds_lang');
+    if (savedLang) { document.getElementById('language-screen').style.display = 'none'; applyTranslations(savedLang); }
+    if(localStorage.getItem('gmds_user')) { document.getElementById('login-page').style.display = 'none'; document.getElementById('main-dashboard').style.display = 'block'; }
+});
+</script>
+</body>
+</html>
