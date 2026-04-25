@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>GMDS - Official Secure Gateway</title>
+
+    
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    
+
+    <style>
+
+        :root { --primary: #16a34a; --gold: #d4af37; --bg-light: #dcfce7; --card-yellow: #fef3c7; --danger: #dc2626; --blue: #2563eb; }
+
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg-light); margin: 0; padding-bottom: 30px; overflow-x: hidden; }
+
+
+
+        /* --- Login Section --- */
+
+        #login-page { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; text-align: center; }
+
+        .logo-circle { width: 115px; height: 115px; border-radius: 50%; border: 3.5px solid var(--gold); padding: 5px; background: white; box-shadow: 0 5px 20px rgba(0,0,0,0.12); margin-bottom: 18px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+
+        .logo-circle img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+        .u-input { width: 100%; max-width: 320px; padding: 16px; margin: 12px 0; border-radius: 12px; border: 1.5px solid #e2e8f0; outline: none; font-size: 16px; background: #f8fafc; transition: 0.3s; }
+
+        .loc-btn { background: #fff4f4; color: #dc2626; border: 2px dashed #dc2626; width: 100%; max-width: 320px; padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: 0.3s; }
+
+        .btn-main { background: var(--primary); color: white; border: 2px solid var(--gold); width: 100%; max-width: 320px; padding: 16px; border-radius: 15px; font-weight: 800; cursor: pointer; font-size: 16px; transition: 0.3s; margin-top: 10px; opacity: 0.5; pointer-events: none; }
+
+        .btn-main.active { opacity: 1; pointer-events: auto; }
+
+
+
+        /* --- Dashboard --- */
+
+        #main-dashboard { display: none; animation: fadeIn 0.6s ease-out; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .header { background: var(--primary); padding: 30px; text-align: center; border-radius: 0 0 40px 40px; }
+
+        .header h2 { margin: 0; color: var(--gold); font-weight: 800; text-shadow: 1.5px 1.5px #000; letter-spacing: 1.5px; }
+
+        .container { padding: 25px 20px; display: flex; flex-direction: column; align-items: center; }
+
+        
+
+        .order-btn { background: #fff; border: 3.5px solid var(--gold); padding: 22px; border-radius: 25px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-bottom: 20px; width: 100%; max-width: 400px; box-sizing: border-box; text-decoration: none; color: black; box-shadow: 0 6px 15px rgba(0,0,0,0.06); }
+
+        
+
+        .action-row { display: flex; gap: 10px; width: 100%; max-width: 400px; margin-bottom: 25px; }
+
+        .quick-btn { flex: 1; background: var(--blue); color: white; padding: 15px; border-radius: 15px; border: none; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
+
+        .logout-btn { flex: 1; background: var(--danger); color: white; padding: 15px; border-radius: 15px; border: none; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2); }
+
+
+
+        .s-card { background: var(--card-yellow); padding: 18px; border-radius: 22px; display: flex; align-items: center; gap: 15px; border: 1px solid #f1f5f9; cursor: pointer; width: 100%; max-width: 400px; margin-bottom: 15px; box-sizing: border-box; }
+
+        .s-img i { font-size: 24px; color: var(--primary); }
+
+        .s-info b { font-size: 16px; color: #1e293b; }
+
+        .s-info p { font-size: 12px; color: #64748b; margin: 2px 0 0; }
+
+
+
+        /* --- Location Modal --- */
+
+        #loc-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center; padding:20px; backdrop-filter: blur(5px); }
+
+        .modal-content { background:white; width:100%; max-width:350px; border-radius:30px; padding:30px; text-align:center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+
+        .location-card { background: #f0fdf4; border-radius: 20px; padding: 20px; border: 2px solid #bbf7d0; text-align: center; margin-bottom: 20px; }
+
+        .landmark-input { width: 100%; padding: 15px; border: 2px solid #cbd5e1; border-radius: 12px; font-size: 15px; outline: none; box-sizing: border-box; background: #ffffff; color: #1e293b; transition: 0.3s; font-family: 'Poppins', sans-serif; }
+
+        .landmark-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.1); }
+
+
+
+        /* --- Professional Digital Seba Modal Styles --- */
+
+        #seba-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:99999; align-items:flex-end; justify-content:center; backdrop-filter: blur(6px); }
+
+        .seba-content { background:#fff; width:100%; max-width:450px; border-radius:30px 30px 0 0; padding:25px; box-shadow: 0 -10px 30px rgba(0,0,0,0.3); animation: gmdsSlideUp 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
+
+        @keyframes gmdsSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+
+
+        .seba-header { font-weight:800; color:#1e293b; text-align:center; margin-bottom:20px; font-size:18px; border-bottom: 2px solid #f1f5f9; padding-bottom:12px; }
+
+        .cat-container { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:20px; }
+
+        .cat-btn { padding:15px 5px; border-radius:18px; border:2.5px solid #f1f5f9; background:#fff; cursor:pointer; text-align:center; transition:0.3s; font-weight:700; font-size:11px; color:#64748b; }
+
+        .cat-btn i { font-size:22px; margin-bottom:8px; display:block; }
+
+        .cat-btn.active { border-color:var(--primary); background:#f0fdf4; color:var(--primary); transform: scale(1.02); }
+
+
+
+        .task-list { display:none; max-height:280px; overflow-y:auto; background:#f8fafc; border-radius:20px; padding:10px; margin-bottom:20px; border: 1px solid #e2e8f0; }
+
+        .task-item { display:flex; align-items:center; justify-content:space-between; padding:15px; border-bottom:1px solid #edf2f7; cursor:pointer; transition:0.2s; border-radius:12px; margin-bottom:5px; }
+
+        .task-item:last-child { border-bottom:none; margin-bottom:0; }
+
+        .task-item:active { background:#e2e8f0; }
+
+        .task-info { display:flex; align-items:center; gap:12px; font-size:14px; font-weight:600; color:#334155; }
+
+        .task-item i { color:var(--primary); font-size:18px; width: 25px; text-align: center; }
+
+
+
+        .confirm-btn { background:var(--primary); color:white; border:none; width:100%; padding:18px; border-radius:20px; font-weight:800; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; box-shadow: 0 5px 15px rgba(22,163,74,0.3); transition: 0.3s; }
+
+        .confirm-btn:active { transform: scale(0.98); }
+
+Confirm-btn { background:var(--primary); color:white; border:none; width:100%; padding:18px; border-radius:20px; font-weight:800; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; box-shadow: 0 5px 15px rgba(22,163,74,0.3); transition: 0.3s; }
+
+        .confirm-btn:active { transform: scale(0.98); }
+
+#store-overlay { 
+    display: none; 
+    position: fixed; 
+    inset: 0; 
+    background: white; 
+    z-index: 999999; 
+}
+
+#store-frame { 
+    width: 100%; 
+    height: 100%; 
+    border: none; 
+    display: block;
+}
+
+.back-bar { 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    background: #16a34a; 
+    color: white; 
+    padding: 14px; 
+    font-weight: 800; 
+    text-align: center; 
+    cursor: pointer; 
+    z-index: 1000000; 
+    box-sizing: border-box;
+}
+
+.gmds-slider-container {
+    width: 95%;
+    max-width: 1024px;
+    aspect-ratio: 21 / 9;
+    margin: 15px auto;
+    overflow: hidden;
+    border-radius: 15px;
+    position: relative;
+    background: #f0f0f0;
+}
+.gmds-slider-wrapper {
+    display: flex;
+    width: 400%;
+    height: 100%;
+    transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+.gmds-slide { width: 25%; height: 100%; }
+.gmds-slide img { width: 100%; height: 100%; object-fit: cover; }
+.gmds-dots {
+    position: absolute;
+    bottom: 10px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+}
+.gmds-dot { width: 8px; height: 8px; background: rgba(255,255,255,0.5); border-radius: 50%; }
+.gmds-dot.active { background: #16a34a; width: 20px; border-radius: 10px; transition: 0.3s; }
+
+.gmds-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #ffffff;
+    display: none; /* Hidden before login */
+    justify-content: space-around;
+    align-items: center;
+    padding: 10px 0; /* Balanced padding for a professional look */
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+    z-index: 999999;
+    border-top: 1.5px solid #f1f5f9;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+}
+
+.nav-item {
+    text-align: center;
+    text-decoration: none;
+    flex: 1;
+    transition: 0.2s;
+}
+
+.nav-item i {
+    font-size: 24px; /* Standard professional icon size */
+    display: block;
+    margin-bottom: 3px;
+}
+
+.nav-item span {
+    font-size: 11px;
+    font-weight: 700;
+    display: block;
+    letter-spacing: 0.3px;
+}
+
+/* Icons Coloring */
+.nav-profile { color: #16a34a; } 
+.nav-star { color: #facc15; } 
+.nav-call { color: #2563eb; } 
+
+/* Content spacing */
+body { padding-bottom: 80px !important; }
+
+    </style>
+
+</head>
+
+<body>
+
+
+
+    <div id="login-page">
+
+        <div class="logo-circle"><img src="logo.png" alt="GMDS Logo"></div>
+
+        <h2 style="color: var(--primary); margin: 0; font-weight: 800;">Welcome to GMDS</h2>
+
+        <input type="text" id="custName" class="u-input" placeholder="Enter Your Name">
+
+        <input type="tel" id="custPhone" class="u-input" placeholder="WhatsApp Number">
+
+        <button class="loc-btn" id="locPermissionBtn" onclick="getGPS()">
+
+            <i class="fas fa-location-crosshairs"></i> ENABLE LOCATION ACCESS
+
+        </button> 
+
+        <button class="btn-main" id="startBtn" onclick="finalizeLogin()">START SERVICES</button>
+
+        <p id="gps-status" style="font-size: 11px; color: #ef4444; margin-top: 18px; font-weight: 800;">
+
+            <i class="fas fa-circle-exclamation"></i> GPS permission required to login
+
+        </p>
+
+    </div>
+
+
+
+    <div id="main-dashboard">
+
+        <div class="map-trigger" onclick="openLocModal()" style="position: absolute; top: 20px; left: 20px; width: 45px; height: 45px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1001; cursor: pointer; border: 2.5px solid var(--gold);">
+
+            <i class="fas fa-map-location-dot" style="color: #ef4444; font-size: 22px;"></i>
+
+        </div>
+
+        <div class="header"><h2>GMDS OFFICIAL</h2></div>
+
+<div class="gmds-slider-container">
+    <div class="gmds-slider-wrapper" id="gmdsWrapper">
+        <div class="gmds-slide" onclick="processOrder('Catalog Order', true)">
+    <img src="banner1.png">
+</div>
+
+  
+        <div class="gmds-slide" onclick="processOrder('Digital Seba', false)"><img src="banner2.png"></div>
+        
+        <div class="gmds-slide" onclick="processOrder('Medicine Delivery', false)"><img src="banner3.png"></div>
+        
+        <div class="gmds-slide" onclick="processOrder('House Help', false)"><img src="banner4.png"></div>
+    </div>
+    <div class="gmds-dots" id="gmdsDots"></div>
+</div>
+
+
+        <div class="container">
+
+            <div class="order-btn" onclick="processOrder('Food Order', true)">
+    <div><b>FOOD ORDER NOW</b><br><small>Browse Menu & Prices</small></div>
+    <i class="fas fa-utensils" style="font-size: 32px; color: var(--primary);"></i>
+</div>
+
+            <div class="action-row">
+
+                <button class="quick-btn" onclick="processQuickDelivery()">
+
+                    <i class="fas fa-bolt-lightning"></i> Quick Delivery
+
+                </button>
+
+                <button class="logout-btn" onclick="userLogout()">
+
+                    <i class="fas fa-power-off"></i> Logout
+
+                </button>
+
+            </div>
+
+
+
+            <div class="s-card" onclick="openSebaModal()">
+
+                <div class="s-img"><i class="fas fa-laptop-code"></i></div>
+
+                <div class="s-info"><b>Digital Seba</b><p>Online Forms & Services</p></div>
+
+            </div>
+
+
+
+            <div class="s-card" onclick="processOrder('Medicine Delivery', false)">
+
+                <div class="s-img"><i class="fas fa-hand-holding-medical"></i></div>
+
+                <div class="s-info"><b>Medicine</b><p>Fast Home Delivery</p></div>
+
+            </div>
+
+
+
+            <div class="s-card" onclick="processOrder('House Help', false)">
+
+                <div class="s-img"><i class="fas fa-house-user"></i></div>
+
+                <div class="s-info"><b>House Help</b><p>Technician Repairs</p></div>
+
+            </div>
+
+
+
+            <a href="https://wa.me/916297474412" style="margin-top: 30px; text-decoration: none; color: var(--primary); font-weight: 800; font-size: 14px;">
+
+                <i class="fas fa-headset"></i> Official Support Center
+
+            </a>
+
+        </div>
+
+    </div>
+
+
+
+    <div id="seba-modal" onclick="event.target == this ? closeSebaModal() : null">
+
+        <div class="seba-content" onclick="event.stopPropagation()">
+
+            <div class="seba-header">GMDS Digital Center</div>
+
+            
+
+            <div class="cat-container">
+
+                <div class="cat-btn" onclick="openCat('pan', this)"><i class="fas fa-id-card"></i>PAN CARD</div>
+
+                <div class="cat-btn" onclick="openCat('voter', this)"><i class="fas fa-address-card"></i>VOTER ID</div>
+
+                <div class="cat-btn" onclick="openCat('ration', this)"><i class="fas fa-bowl-rice"></i>RATION CARD</div>
+
+            </div>
+
+
+
+            <div id="box-pan" class="task-list">
+
+                <div class="task-item" onclick="setTask('PAN Correction')"><div class="task-info"><i class="fas fa-pen-to-square"></i> PAN Correction</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('PAN PVC Card')"><div class="task-info"><i class="fas fa-credit-card"></i> PAN PVC Card</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('Lost PAN Recovery')"><div class="task-info"><i class="fas fa-magnifying-glass"></i> Lost PAN Recovery</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('PAN to Mobile Link')"><div class="task-info"><i class="fas fa-mobile-screen"></i> PAN to Mobile Link</div><i class="fas fa-chevron-right"></i></div>
+
+            </div>
+
+
+
+            <div id="box-voter" class="task-list">
+
+                <div class="task-item" onclick="setTask('New Voter Card')"><div class="task-info"><i class="fas fa-plus-circle"></i> New Voter Card</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('Voter Correction')"><div class="task-info"><i class="fas fa-user-pen"></i> Voter Correction</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('Mobile Number Link')"><div class="task-info"><i class="fas fa-mobile-screen"></i> Mobile Number Link</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('Voter PVC Card')"><div class="task-info"><i class="fas fa-id-badge"></i> Voter PVC Card</div><i class="fas fa-chevron-right"></i></div>
+
+            </div>
+
+
+
+            <div id="box-ration" class="task-list">
+
+                <div class="task-item" onclick="setTask('New Ration Card')"><div class="task-info"><i class="fas fa-file-circle-plus"></i> New Ration Card</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('Ration Correction')"><div class="task-info"><i class="fas fa-file-pen"></i> Ration Correction</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('Ration PVC Card')"><div class="task-info"><i class="fas fa-sim-card"></i> Ration PVC Card</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('KYC / Mobile Link')"><div class="task-info"><i class="fas fa-fingerprint"></i> KYC / Mobile Link</div><i class="fas fa-chevron-right"></i></div>
+
+                <div class="task-item" onclick="setTask('Family Separation')"><div class="task-info"><i class="fas fa-users-slash"></i> Family Separation</div><i class="fas fa-chevron-right"></i></div>
+
+            </div>
+
+
+
+            <button class="confirm-btn" onclick="sendSebaOrder()">
+
+                <span id="selected-label">Select Service First</span>
+
+            </button>
+
+            <button onclick="closeSebaModal()" style="background:none; border:none; color:var(--danger); width:100%; margin-top:15px; font-weight:700; cursor:pointer; font-size:14px;">CANCEL</button>
+
+        </div>
+
+    </div>
+
+
+
+    <div id="loc-modal">
+
+        <div class="modal-content">
+
+            <h3 style="margin:0 0 15px; color:#1e293b; font-weight:800; font-size: 22px;">Location Sync</h3>
+
+            <div class="location-card">
+
+                <div style="font-size: 14px; color: var(--primary); font-weight: 700; margin-bottom: 10px;">📍 Village: <strong id="v-name">Detecting...</strong></div>
+
+                <input type="text" id="custLandmark" class="landmark-input" placeholder="পাড়ার নাম বা ল্যান্ডমার্ক লিখুন">
+
+            </div>
+
+            <button onclick="reSyncLocation()" style="background:var(--primary); color:white; border:none; width:100%; padding:16px; border-radius:12px; font-weight:800; cursor:pointer; font-size: 16px; margin-bottom: 10px;">
+
+                <i class="fas fa-location-arrow"></i> SEND LIVE LOCATION
+
+            </button>
+
+            <button onclick="closeLocModal()" style="background:none; border:none; color:var(--danger); margin-top:15px; font-weight:700; cursor:pointer; font-size: 15px;">CLOSE</button>
+
+        </div>
+
+    </div>
+
+
+
+<script>
+
+/**
+
+ * GMDS PRO ENGINE & NOTIFICATION SYSTEM
+
+ */
+
+const scriptURL = "https://script.google.com/macros/s/AKfycbyEXWdxtVDjStNtXdVc1Vz5oijaflS7XjpDj0zAVynjCjahw6pnTbQuQoWkyxFClp5WCQ/exec";
+
+const gmds_notify_source = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/notify.json";
+
+let finalUserLocation = "";
+
+let autoDetectedVillage = "Unknown";
+
+let finalSebaTask = "";
+
+
+
+// --- Digital Seba Functions ---
+
+function openSebaModal() { 
+
+    document.getElementById('seba-modal').style.display = 'flex'; 
+
+    const firstCat = document.querySelector('.cat-btn');
+
+    if(firstCat) openCat('pan', firstCat);
+
+}
+
+
+
+function closeSebaModal() { 
+
+    document.getElementById('seba-modal').style.display = 'none'; 
+
+}
+
+
+
+function openCat(type, btn) {
+
+    const lists = document.querySelectorAll('.task-list');
+
+    for(let list of lists) { list.style.display = 'none'; }
+
+    const btns = document.querySelectorAll('.cat-btn');
+
+    for(let b of btns) { b.classList.remove('active'); }
+
+    document.getElementById('box-' + type).style.display = 'block';
+
+    btn.classList.add('active');
+
+    document.getElementById('selected-label').innerText = "Choose Action Below";
+
+    finalSebaTask = "";
+
+}
+
+
+
+function setTask(taskName) {
+
+    finalSebaTask = taskName;
+
+    document.getElementById('selected-label').innerText = "CONFIRM NOW: " + taskName;
+
+    if(window.navigator.vibrate) window.navigator.vibrate(25);
+
+}
+
+
+
+function sendSebaOrder() {
+
+    if(!finalSebaTask) { 
+
+        alert("Please select a specific service first!"); 
+
+        return; 
+
+    }
+
+    const name = localStorage.getItem('gmds_user');
+
+    const phone = localStorage.getItem('gmds_phone');
+
+    const village = localStorage.getItem('gmds_village') || "Local Area";
+
+    const landmark = localStorage.getItem('gmds_landmark') || "N/A";
+
+    pushData(name, phone, "Digital Seba: " + finalSebaTask);
+
+    const waMsg = encodeURIComponent(`*GMDS DIGITAL SEBA ORDER*\n\n*Service:* ${finalSebaTask}\n*Customer:* ${name}\n*Address:* ${village} | ${landmark}\n*Location:* ${finalUserLocation}`);
+
+    window.location.href = `https://wa.me/916297474412?text=${waMsg}`;
+
+    closeSebaModal();
+
+}
+
+
+
+// --- Notifications Engine ---
+
+function syncGMDSNotifications() {
+
+    fetch(gmds_notify_source + "?v=" + new Date().getTime())
+
+    .then(res => res.json())
+
+    .then(data => {
+
+        const lastReadId = localStorage.getItem('gmds_last_notify_id');
+
+        if (data.status === "active" && data.id != lastReadId) {
+
+            if ("Notification" in window && Notification.permission === "granted") {
+
+                new Notification(data.title, {
+
+                    body: data.message,
+
+                    icon: "logo.png",
+
+                    vibrate: [200, 100, 200]
+
+                });
+
+            } 
+
+            setTimeout(() => {
+
+                alert("📢 GMDS NEWS:\n\n" + data.title + "\n" + data.message);
+
+            }, 500);
+
+            localStorage.setItem('gmds_last_notify_id', data.id);
+
+        }
+
+    })
+
+    .catch(e => console.log("Sync waiting..."));
+
+}
+
+
+
+// --- Sessions & Helpers ---
+
+function setCookie(name, value) {
+
+    const d = new Date();
+
+    d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+    document.cookie = `${name}=${value};expires=${d.toUTCString()};path=/`;
+
+}
+
+
+
+function openLocModal() { document.getElementById('loc-modal').style.display = 'flex'; }
+
+function closeLocModal() { document.getElementById('loc-modal').style.display = 'none'; }
+
+
+
+async function fetchVillageName(lat, lon) {
+
+    try {
+
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`);
+
+        const data = await response.json();
+
+        autoDetectedVillage = data.address.village || data.address.suburb || data.address.neighbourhood || "Local Area";
+
+        document.getElementById('v-name').innerText = autoDetectedVillage;
+
+        localStorage.setItem('gmds_village', autoDetectedVillage);
+
+    } catch (e) { console.log("Geocoding Error"); }
+
+}
+
+
+
+function getGPS() {
+
+    const locBtn = document.getElementById('locPermissionBtn');
+
+    const startBtn = document.getElementById('startBtn');
+
+    if (navigator.geolocation) {
+
+        navigator.geolocation.getCurrentPosition((pos) => {
+
+            const lat = pos.coords.latitude;
+
+            const lon = pos.coords.longitude;
+
+            finalUserLocation = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+
+            fetchVillageName(lat, lon);
+
+            locBtn.innerHTML = '<i class="fas fa-circle-check"></i> LOCATION SECURED';
+
+            locBtn.style.background = "#f0fdf4";
+
+            locBtn.style.color = "#16a34a";
+
+            startBtn.classList.add('active');
+
+            startBtn.disabled = false;
+
+        }, null, { enableHighAccuracy: true });
+
+    }
+
+}
+
+
+
+async function finalizeLogin() {
+
+    const name = document.getElementById('custName').value.trim();
+
+    const phone = document.getElementById('custPhone').value.trim();
+
+    if(!name || phone.length < 10) { alert("Enter valid credentials!"); return; }
+
+    localStorage.setItem('gmds_user', name);
+
+    localStorage.setItem('gmds_phone', phone);
+
+    setCookie('gmds_user', name);
+
+    pushData(name, phone, "User Gateway Entry Success");
+
+    document.getElementById('login-page').style.display = 'none';
+
+    document.getElementById('main-dashboard').style.display = 'block';
+
+}
+
+
+
+function reSyncLocation() {
+
+    const btn = document.querySelector('.modal-content button');
+
+    const landmarkInput = document.getElementById('custLandmark').value.trim();
+
+    if(!landmarkInput) { alert("দয়া করে ল্যান্ডমার্ক লিখুন!"); return; }
+
+    
+
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+
+        const lat = pos.coords.latitude;
+
+        const lon = pos.coords.longitude;
+
+        finalUserLocation = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+
+        await fetchVillageName(lat, lon);
+
+        localStorage.setItem('gmds_landmark', landmarkInput);
+
+        pushData(localStorage.getItem('gmds_user'), localStorage.getItem('gmds_phone'), "MANUAL_LIVE_GPS_SYNC");
+
+        btn.innerHTML = '<i class="fas fa-check"></i> SUCCESSFUL';
+
+        setTimeout(() => { closeLocModal(); btn.innerHTML = '<i class="fas fa-location-arrow"></i> SEND LIVE LOCATION'; }, 1000);
+
+    }, null, { enableHighAccuracy: true });
+
+}
+
+
+
+function processQuickDelivery() {
+
+    const name = localStorage.getItem('gmds_user');
+
+    const phone = localStorage.getItem('gmds_phone');
+
+    const village = localStorage.getItem('gmds_village') || "Unknown";
+
+    const landmark = localStorage.getItem('gmds_landmark') || "N/A";
+
+    pushData(name, phone, "QUICK_DELIVERY_CONFIRM");
+
+    const waMsg = encodeURIComponent(`*GMDS QUICK DELIVERY*\n*Customer:* ${name}\n*Address:* ${village} | ${landmark}\n*Map Link:* ${finalUserLocation}`);
+
+    window.location.href = `https://wa.me/916297474412?text=${waMsg}`;
+
+}
+
+
+
+function userLogout() {
+
+    if (confirm("Confirm Logout? All data will be cleared.")) {
+
+        localStorage.clear();
+
+        document.cookie = "gmds_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+        window.location.reload();
+
+    }
+
+}
+
+
+
+function processOrder(service, isCatalog) {
+
+    const name = localStorage.getItem('gmds_user');
+
+    const phone = localStorage.getItem('gmds_phone');
+
+    const fullAddr = (localStorage.getItem('gmds_village') || "Unknown") + " | " + (localStorage.getItem('gmds_landmark') || "N/A");
+
+    pushData(name, phone, service);
+
+if(isCatalog) window.location.href = "https://wa.me/c/916297474412";
+
+
+    else {
+
+        const waMsg = encodeURIComponent(`*GMDS REQUEST*\n*Service:* ${service}\n*Customer:* ${name}\n*Address:* ${fullAddr}\n*Map Link:* ${finalUserLocation}`);
+
+        window.location.href = `https://wa.me/916297474412?text=${waMsg}`;
+
+    }
+
+}
+
+
+
+async function pushData(n, p, s) {
+
+    try {
+
+        fetch(scriptURL, {
+
+            method: 'POST',
+
+            mode: 'no-cors',
+
+            headers: { 'Content-Type': 'application/json' },
+
+            body: JSON.stringify({ 
+
+                name: n, phone: p, service: s, 
+
+                location: finalUserLocation,
+
+                address: (localStorage.getItem('gmds_village') || "Unknown") + " | " + (localStorage.getItem('gmds_landmark') || "N/A")
+
+            })
+
+        });
+
+    } catch (e) { console.log("Sync Error"); }
+
+}
+
+
+
+setInterval(() => {
+
+    syncGMDSNotifications();
+
+    if (navigator.geolocation && localStorage.getItem('gmds_user')) {
+
+        navigator.geolocation.getCurrentPosition((pos) => {
+
+            const lat = pos.coords.latitude;
+
+            const lon = pos.coords.longitude;
+
+            finalUserLocation = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+
+            pushData(localStorage.getItem('gmds_user'), localStorage.getItem('gmds_phone'), "Live Background Update");
+
+        }, null, { enableHighAccuracy: true });
+
+    }
+
+}, 300000); 
+
+
+
+window.onload = () => {
+
+    if ("Notification" in window) {
+
+        if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+
+            Notification.requestPermission();
+
+        }
+
+    }
+
+    if(localStorage.getItem('gmds_user')) {
+        document.getElementById('login-page').style.display = 'none';
+        document.getElementById('main-dashboard').style.display = 'block';
+
+        // --- Just add this line below the block display line ---
+        document.querySelector('.gmds-bottom-nav').style.display = 'flex';
+    }
+    
+    setTimeout(syncGMDSNotifications, 2000);
+};
+
+        let currentGmdsSlide = 0;
+        const gmdsWrapper = document.getElementById('gmdsWrapper');
+        const gmdsDotsContainer = document.getElementById('gmdsDots');
+
+        for (let i = 0; i < 4; i++) {
+            const dot = document.createElement('div');
+            dot.classList.add('gmds-dot');
+            if (i === 0) dot.classList.add('active');
+            gmdsDotsContainer.appendChild(dot);
+        }
+
+        const gmdsDots = document.querySelectorAll('.gmds-dot');
+
+        function moveGmdsSlider() {
+            if(!gmdsWrapper) return;
+            gmdsWrapper.style.transform = `translateX(-${currentGmdsSlide * 25}%)`;
+            gmdsDots.forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentGmdsSlide);
+            });
+        }
+
+        setInterval(() => {
+            currentGmdsSlide = (currentGmdsSlide + 1) % 4;
+            moveGmdsSlider();
+        }, 4000);
+
+        let gmdsStartX = 0;
+        gmdsWrapper.addEventListener('touchstart', e => gmdsStartX = e.touches[0].clientX);
+        gmdsWrapper.addEventListener('touchend', e => {
+            let diff = gmdsStartX - e.changedTouches[0].clientX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) currentGmdsSlide = (currentGmdsSlide + 1) % 4;
+                else currentGmdsSlide = (currentGmdsSlide - 1 + 4) % 4;
+                moveGmdsSlider();
+            }
+        });
+
+    </script>
+  
+
+
+<script>
+
+function showUserProfile() {
+    
+    const name = localStorage.getItem('gmds_user') || "Guest";
+    const phone = localStorage.getItem('gmds_phone') || "N/A";
+    const landmark = localStorage.getItem('gmds_landmark') || "Not provided";
+
+    document.getElementById('p-name').innerText = name;
+    document.getElementById('p-phone').innerText = phone;
+    document.getElementById('p-land').innerText = landmark;
+
+    document.getElementById('profile-modal').style.display = 'flex';
+}
+
+function closeProfile() {
+    document.getElementById('profile-modal').style.display = 'none';
+}
+
+
+</script>
+
+    <div id="profile-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000000; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: white; width: 100%; max-width: 320px; border-radius: 25px; overflow: hidden; animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 15px 35px rgba(0,0,0,0.3);">
+            
+            <div style="background: linear-gradient(135deg, #16a34a, #22c55e); padding: 35px 20px; text-align: center; color: white;">
+                <div style="background: rgba(255,255,255,0.2); width: 70px; height: 70px; border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-user-circle" style="font-size: 45px;"></i>
+                </div>
+                <h3 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: 1px; font-family: sans-serif;">MY ACCOUNT</h3>
+            </div>
+            
+            <div style="padding: 25px; background: #fff; font-family: sans-serif;">
+                <div style="margin-bottom: 18px; border-left: 4px solid #16a34a; padding-left: 12px;">
+                    <label style="font-size: 10px; color: #888; font-weight: 800; display: block; text-transform: uppercase; letter-spacing: 0.5px;">Full Name</label>
+                    <div id="p-name" style="font-size: 16px; color: #222; font-weight: 700;">-</div>
+                </div>
+                
+                <div style="margin-bottom: 18px; border-left: 4px solid #16a34a; padding-left: 12px;">
+                    <label style="font-size: 10px; color: #888; font-weight: 800; display: block; text-transform: uppercase; letter-spacing: 0.5px;">WhatsApp Number</label>
+                    <div id="p-phone" style="font-size: 16px; color: #222; font-weight: 700;">-</div>
+                </div>
+                
+                <div style="margin-bottom: 5px; border-left: 4px solid #16a34a; padding-left: 12px;">
+                    <label style="font-size: 10px; color: #888; font-weight: 800; display: block; text-transform: uppercase; letter-spacing: 0.5px;">Saved Landmark</label>
+                    <div id="p-land" style="font-size: 14px; color: #444; font-weight: 600;">-</div>
+                </div>
+            </div>
+
+            <button onclick="closeProfile()" style="width: 100%; padding: 18px; border: none; background: #f8fafc; color: #16a34a; font-weight: 800; cursor: pointer; font-size: 14px; border-top: 1px solid #eee; letter-spacing: 1px; transition: 0.3s;">OK, CLOSE</button>
+        </div>
+    </div>
+
+    <style>
+        @keyframes slideUp { 
+            from { transform: translateY(40px); opacity: 0; } 
+            to { transform: translateY(0); opacity: 1; } 
+        }
+    </style>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <div class="gmds-bottom-nav">
+        <a href="javascript:void(0)" class="nav-item nav-profile" onclick="showUserProfile()">
+            <i class="fas fa-user-circle"></i>
+            <span>Profile</span>
+        </a>
+
+        <a href="https://g.page/r/CdDHOxw63VjPEAE/review" target="_blank" class="nav-item nav-star">
+            <i class="fas fa-star-half-stroke"></i>
+            <span>Rate Us</span>
+        </a>
+
+        <a href="tel:6297474412" class="nav-item nav-call">
+            <i class="fas fa-phone-volume"></i>
+            <span>Call Now</span>
+        </a>
+    </div>
+
+</body>
+</html>
+
