@@ -2483,7 +2483,7 @@ function loadMenu() {
                 const hNode = hotelStatuses[hotelId];
                 if (hNode && hNode.lat && hNode.lng) {
                     let dist = calculateDistance(currentLat, currentLng, parseFloat(hNode.lat), parseFloat(hNode.lng));
-                    deliveryRouteText = `*📏 Distance:* ... /2{parseFloat(hNode.lat)},${parseFloat(hNode.lng)} ...`;
+                    deliveryRouteText = `*📏 Distance:* ${dist.toFixed(1)} km\n*🗺️ Route Map:* https://www.google.com/maps/dir/${parseFloat(hNode.lat)},${parseFloat(hNode.lng)}/${currentLat},${currentLng}\n`;
 
                 }
             }
