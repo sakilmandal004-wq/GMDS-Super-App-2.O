@@ -2044,7 +2044,7 @@ function loadMenu() {
                 
                 if (hNode && typeof hNode === 'object' && hNode.lat && hNode.lng) {
                     let dist = calculateDistance(currentLat, currentLng, parseFloat(hNode.lat), parseFloat(hNode.lng));
-                    if (dist <= 20) { 
+                   if (dist <= 17)  { 
                         p.distance = dist; 
                         nearbyItems.push(p);
                     }
@@ -2054,7 +2054,7 @@ function loadMenu() {
             nearbyItems.sort((a, b) => a.distance - b.distance);
             
             if(nearbyItems.length === 0) {
-                container.innerHTML = `<div style='text-align:center; padding: 50px 20px;'><i class='fas fa-store-slash fa-3x mb-3 text-red-500'></i><h4 class='text-gray-700 font-extrabold text-lg'>No Restaurants Found</h4><p class='text-xs mt-2 text-gray-500'>Sorry! No partner restaurants found within 20km of your location.</p></div>`;
+                container.innerHTML = `<div style='text-align:center; padding: 50px 20px;'><i class='fas fa-store-slash fa-3x mb-3 text-red-500'></i><h4 class='text-gray-700 font-extrabold text-lg'>No Restaurants Found</h4><p class='text-xs mt-2 text-gray-500'>Sorry! No partner restaurants found within 17km of your location.</p></div>`;
                 return;
             }
             
