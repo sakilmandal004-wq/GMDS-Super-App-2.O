@@ -1,11 +1,37 @@
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit'); // 🛡️ সিকিউরিটি ও স্প্যাম প্রতিরোধের জন্য রেট লিমিটার
 
 const app = express();
 
 // Middleware: Enable Cross-Origin Resource Sharing and JSON body parsing
 app.use(express.json());
 app.use(cors());
+
+// 🛡️ ১. গ্লোবাল রেট লিমিটার (প্রতি ১৫ মিনিটে একটি আইপি থেকে সর্বোচ্চ ১০০টি রিকোয়েস্ট)
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    max: 100,
+    message: {
+        status: "error",
+        message: "Too many requests from this IP, please try again later."
+    },
+    standardHeaders: true, 
+    legacyHeaders: false, 
+});
+
+// 🛡️ ২. অর্ডার ও বুকিং এপিআই-র জন্য কড়া লিমিট (প্রতি ৫ মিনিটে সর্বোচ্চ ৩টি অর্ডার)
+const orderLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, 
+    max: 3, 
+    message: {
+        status: "error",
+        message: "Security Lock: You are placing orders too fast. Please wait a few minutes."
+    }
+});
+
+// গ্লোবাল লিমিট সব এপিআই-র ওপর অ্যাপ্লাই করা হলো
+app.use('/api/', globalLimiter);
 
 // 1. Server Health Check API
 app.get('/', (req, res) => {
@@ -20,7 +46,7 @@ app.get('/', (req, res) => {
 app.post('/api/log', (req, res) => {
     const { name, phone, service, location, address, timestamp } = req.body;
     
-    // Logs activity to the server console (can be routed to MongoDB/Firebase later)
+    // Logs activity to the server console
     console.log(`📝 [LOG] ${name} (${phone}) - Service: ${service}`);
     
     res.json({ 
@@ -29,8 +55,8 @@ app.post('/api/log', (req, res) => {
     });
 });
 
-// 3. Multi-Sector Order Processing API
-app.post('/api/place-order', (req, res) => {
+// 3. Multi-Sector Order Processing API (এখানে স্প্যাম রোধে কড়া অর্ডার লিমিটার বসানো হলো)
+app.post('/api/place-order', orderLimiter, (req, res) => {
     const orderData = req.body;
     
     // Order reception and backend validation logging
