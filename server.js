@@ -4,6 +4,9 @@ const rateLimit = require('express-rate-limit'); // 🛡️ সিকিউর�
 
 const app = express();
 
+// 🚀 প্রক্সি ট্রাস্ট সেটিং (Render-এর জন্য বাধ্যতামূলক, এটি IP Error ঠিক করবে)
+app.set('trust proxy', 1);
+
 // Middleware: Enable Cross-Origin Resource Sharing and JSON body parsing
 app.use(express.json());
 app.use(cors());
@@ -46,8 +49,8 @@ app.get('/', (req, res) => {
 app.post('/api/log', (req, res) => {
     const { name, phone, service, location, address, timestamp } = req.body;
     
-    // Logs activity to the server console
-    console.log(`📝 [LOG] ${name} (${phone}) - Service: ${service}`);
+    // Logs activity to the server console (undefined এড়াতে || 'Unknown' ব্যবহার করা হলো)
+    console.log(`📝 [LOG] ${name || 'Unknown'} (${phone || 'N/A'}) - Service: ${service || 'N/A'}`);
     
     res.json({ 
         status: "success", 
@@ -59,9 +62,15 @@ app.post('/api/log', (req, res) => {
 app.post('/api/place-order', orderLimiter, (req, res) => {
     const orderData = req.body;
     
+    // 🛠️ ডাইনামিক ডেটা হ্যান্ডলিং (undefined সমস্যা সমাধানের জন্য)
+    const customerName = orderData.user || orderData.customer || orderData.name || "Unknown";
+    const orderAmount = orderData.grandTotal || orderData.price || "N/A";
+    const paymentMode = orderData.payMode || "Cash";
+
     // Order reception and backend validation logging
-    console.log(`🛒 [NEW ORDER] ID: ${orderData.orderId} | By: ${orderData.user}`);
-    console.log(`💰 Total: ₹${orderData.grandTotal} | Mode: ${orderData.payMode}`);
+    console.log(`🛒 [NEW ORDER] ID: ${orderData.orderId} | By: ${customerName}`);
+    console.log(`💰 Total: ₹${orderAmount} | Mode: ${paymentMode}`);
+    console.log(`📦 Service Type: ${orderData.type || orderData.service || 'General'}`);
 
     // Standardized JSON response
     res.json({ 
@@ -74,7 +83,7 @@ app.post('/api/place-order', orderLimiter, (req, res) => {
 // 4. Online Payment Integration (Placeholder for Razorpay/UPI)
 app.post('/api/payment/create', (req, res) => {
     const { amount, phone } = req.body;
-    console.log(`💳 [PAYMENT REQUEST] Amount: ₹${amount} for ${phone}`);
+    console.log(`💳 [PAYMENT REQUEST] Amount: ₹${amount || '0'} for ${phone || 'Unknown'}`);
     
     // Server-side Razorpay order creation logic will execute here
     res.json({ 
