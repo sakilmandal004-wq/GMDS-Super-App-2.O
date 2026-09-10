@@ -1,17 +1,22 @@
 const express = require('express');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit'); // 🛡️ সিকিউরিটি ও স্প্যাম প্রতিরোধের জন্য রেট লিমিটার
+const rateLimit = require('express-rate-limit');
+const mongoose = require('mongoose'); // 📦 MongoDB Integration Library
 
 const app = express();
 
-// 🚀 প্রক্সি ট্রাস্ট সেটিং (Render-এর জন্য বাধ্যতামূলক, এটি IP Error ঠিক করবে)
+// 🚀 Proxy Trust Setting (Mandatory for Render to prevent IP errors)
 app.set('trust proxy', 1);
 
 // Middleware: Enable Cross-Origin Resource Sharing and JSON body parsing
 app.use(express.json());
 app.use(cors());
 
-// 🛡️ ১. গ্লোবাল রেট লিমিটার (প্রতি ১৫ মিনিটে একটি আইপি থেকে সর্বোচ্চ ১০০টি রিকোয়েস্ট)
+// =========================================================
+// 🛡️ SECURITY: API RATE LIMITERS
+// =========================================================
+
+// 1. Global Rate Limiter (Max 100 requests per 15 minutes per IP)
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
     max: 100,
@@ -23,7 +28,7 @@ const globalLimiter = rateLimit({
     legacyHeaders: false, 
 });
 
-// 🛡️ ২. অর্ডার ও বুকিং এপিআই-র জন্য কড়া লিমিট (প্রতি ৫ মিনিটে সর্বোচ্চ ৩টি অর্ডার)
+// 2. Strict Order Limiter (Max 3 orders per 5 minutes per IP to prevent spam)
 const orderLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, 
     max: 3, 
@@ -33,8 +38,34 @@ const orderLimiter = rateLimit({
     }
 });
 
-// গ্লোবাল লিমিট সব এপিআই-র ওপর অ্যাপ্লাই করা হলো
+// Apply global limiter to all /api/ routes
 app.use('/api/', globalLimiter);
+
+// =========================================================
+// 💾 DATABASE: MONGODB CONNECTION & SCHEMAS
+// =========================================================
+
+// Connect to MongoDB Atlas using Render Environment Variable
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ Connected to MongoDB Atlas successfully!'))
+    .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Define Order Schema (Blueprint for database records)
+const orderSchema = new mongoose.Schema({
+    orderId: String,
+    customerName: String,
+    phone: String,
+    orderAmount: String,
+    paymentMode: String,
+    serviceType: String,
+    timestamp: { type: Date, default: Date.now }
+});
+
+const Order = mongoose.model('Order', orderSchema);
+
+// =========================================================
+// 🌐 SYSTEM API ROUTES
+// =========================================================
 
 // 1. Server Health Check API
 app.get('/', (req, res) => {
@@ -45,39 +76,61 @@ app.get('/', (req, res) => {
     });
 });
 
-// 2. User Activity & Action Logging API (Replaces Google Apps Script)
+// 2. User Activity & Action Logging API
 app.post('/api/log', (req, res) => {
     const { name, phone, service, location, address, timestamp } = req.body;
     
-    // Logs activity to the server console (undefined এড়াতে || 'Unknown' ব্যবহার করা হলো)
+    // Server console logging for activity monitoring
     console.log(`📝 [LOG] ${name || 'Unknown'} (${phone || 'N/A'}) - Service: ${service || 'N/A'}`);
     
     res.json({ 
         status: "success", 
-        message: "Data logged securely via Backend" 
+        message: "Data logged securely via Backend." 
     });
 });
 
-// 3. Multi-Sector Order Processing API (এখানে স্প্যাম রোধে কড়া অর্ডার লিমিটার বসানো হলো)
-app.post('/api/place-order', orderLimiter, (req, res) => {
-    const orderData = req.body;
-    
-    // 🛠️ ডাইনামিক ডেটা হ্যান্ডলিং (undefined সমস্যা সমাধানের জন্য)
-    const customerName = orderData.user || orderData.customer || orderData.name || "Unknown";
-    const orderAmount = orderData.grandTotal || orderData.price || "N/A";
-    const paymentMode = orderData.payMode || "Cash";
+// 3. Multi-Sector Order Processing API (Secured & Database Integrated)
+app.post('/api/place-order', orderLimiter, async (req, res) => {
+    try {
+        const orderData = req.body;
+        
+        // Dynamic Data Handling (Prevents 'undefined' errors)
+        const customerName = orderData.user || orderData.customer || orderData.name || "Unknown";
+        const orderAmount = orderData.grandTotal || orderData.price || "N/A";
+        const paymentMode = orderData.payMode || "Cash";
+        const serviceType = orderData.type || orderData.service || 'General';
 
-    // Order reception and backend validation logging
-    console.log(`🛒 [NEW ORDER] ID: ${orderData.orderId} | By: ${customerName}`);
-    console.log(`💰 Total: ₹${orderAmount} | Mode: ${paymentMode}`);
-    console.log(`📦 Service Type: ${orderData.type || orderData.service || 'General'}`);
+        // Log incoming order details to the server console
+        console.log(`🛒 [NEW ORDER] ID: ${orderData.orderId} | By: ${customerName}`);
+        console.log(`💰 Total: ₹${orderAmount} | Mode: ${paymentMode} | Service: ${serviceType}`);
 
-    // Standardized JSON response
-    res.json({ 
-        status: "success", 
-        message: "Order verified and processed successfully.",
-        orderId: orderData.orderId
-    });
+        // 💾 Save the order securely to MongoDB Database
+        const newOrder = new Order({
+            orderId: orderData.orderId,
+            customerName: customerName,
+            phone: orderData.phone || "N/A",
+            orderAmount: orderAmount,
+            paymentMode: paymentMode,
+            serviceType: serviceType
+        });
+
+        await newOrder.save();
+        console.log(`💾 [DATABASE] Order ${orderData.orderId} saved to MongoDB Atlas!`);
+
+        // Standardized JSON response to Frontend
+        res.json({ 
+            status: "success", 
+            message: "Order verified and saved to database successfully.",
+            orderId: orderData.orderId
+        });
+        
+    } catch (error) {
+        console.error("❌ Database Error while saving order:", error);
+        res.status(500).json({ 
+            status: "error", 
+            message: "Internal server error while processing the database request." 
+        });
+    }
 });
 
 // 4. Online Payment Integration (Placeholder for Razorpay/UPI)
@@ -85,14 +138,16 @@ app.post('/api/payment/create', (req, res) => {
     const { amount, phone } = req.body;
     console.log(`💳 [PAYMENT REQUEST] Amount: ₹${amount || '0'} for ${phone || 'Unknown'}`);
     
-    // Server-side Razorpay order creation logic will execute here
+    // Server-side Razorpay logic will execute here
     res.json({ 
         status: "pending", 
         transaction_id: "txn_" + Date.now() 
     });
 });
 
-// Dynamic Server Port Configuration
+// =========================================================
+// 🚀 START SERVER INSTANCE
+// =========================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`=================================`);
