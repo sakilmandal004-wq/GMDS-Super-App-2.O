@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose'); // 📦 MongoDB Integration Library
+const Razorpay = require('razorpay'); // 💳 Razorpay Library Integration
 
 const app = express();
 
@@ -11,6 +12,14 @@ app.set('trust proxy', 1);
 // Middleware: Enable Cross-Origin Resource Sharing and JSON body parsing
 app.use(express.json());
 app.use(cors());
+
+// =========================================================
+// 💳 RAZORPAY CONFIGURATION (Live Keys Integrated)
+// =========================================================
+const razorpayInstance = new Razorpay({
+    key_id: 'rzp_live_TbAMObdldQiFA3',
+    key_secret: 'ubDKZovCOCseIbG4YQ3w3jN1'
+});
 
 // =========================================================
 // 🛡️ SECURITY: API RATE LIMITERS
@@ -45,7 +54,7 @@ app.use('/api/', globalLimiter);
 // 💾 DATABASE: MONGODB CONNECTION & SCHEMAS
 // =========================================================
 
-// Connect to MongoDB Atlas using Render Environment Variable
+// Connect to MongoDB Atlas using Render Environment Variable (or fallback)
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ Connected to MongoDB Atlas successfully!'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
@@ -58,6 +67,7 @@ const orderSchema = new mongoose.Schema({
     orderAmount: String,
     paymentMode: String,
     serviceType: String,
+    razorpayOrderId: String, // 💳 Track Razorpay secure order reference
     timestamp: { type: Date, default: Date.now }
 });
 
@@ -72,7 +82,7 @@ app.get('/', (req, res) => {
     res.json({
         status: "success",
         message: "GMDS Secure Backend is Live & Running! 🚀",
-        version: "2.0.0"
+        version: "2.0.1"
     });
 });
 
@@ -111,7 +121,8 @@ app.post('/api/place-order', orderLimiter, async (req, res) => {
             phone: orderData.phone || "N/A",
             orderAmount: orderAmount,
             paymentMode: paymentMode,
-            serviceType: serviceType
+            serviceType: serviceType,
+            razorpayOrderId: orderData.razorpayOrderId || "N/A"
         });
 
         await newOrder.save();
@@ -133,16 +144,47 @@ app.post('/api/place-order', orderLimiter, async (req, res) => {
     }
 });
 
-// 4. Online Payment Integration (Placeholder for Razorpay/UPI)
-app.post('/api/payment/create', (req, res) => {
-    const { amount, phone } = req.body;
-    console.log(`💳 [PAYMENT REQUEST] Amount: ₹${amount || '0'} for ${phone || 'Unknown'}`);
-    
-    // Server-side Razorpay logic will execute here
-    res.json({ 
-        status: "pending", 
-        transaction_id: "txn_" + Date.now() 
-    });
+// =========================================================
+// 💳 4. SECURE RAZORPAY PAYMENT & ORDER CREATION API
+// =========================================================
+app.post('/api/payment/create', async (req, res) => {
+    try {
+        const { amount, phone, orderId } = req.body;
+        
+        if (!amount || isNaN(amount) || amount <= 0) {
+            return res.status(400).json({ status: "error", message: "Invalid payment amount specified." });
+        }
+
+        console.log(`💳 [PAYMENT REQUEST] Amount: ₹${amount} | Phone: ${phone || 'Unknown'} | Order: ${orderId || 'N/A'}`);
+
+        // Options for Razorpay Order Generation (Amount converted to Paisa safely)
+        const options = {
+            amount: Math.round(Number(amount) * 100), // Ensuring strict integer paisa amount
+            currency: "INR",
+            receipt: "rcpt_" + (orderId || Date.now()),
+            payment_capture: 1 // Auto-capture payment
+        };
+
+        // Create order securely via Razorpay API
+        const razorpayOrder = await razorpayInstance.orders.create(options);
+        
+        console.log(`✅ [RAZORPAY] Secure Order Generated: ${razorpayOrder.id}`);
+
+        res.json({ 
+            status: "success", 
+            key: "rzp_live_TbAMObdldQiFA3", // Safe public-facing live key for checkout initialization
+            order_id: razorpayOrder.id,
+            amount: razorpayOrder.amount,
+            currency: razorpayOrder.currency
+        });
+
+    } catch (error) {
+        console.error("❌ Razorpay Order Creation Error:", error);
+        res.status(500).json({ 
+            status: "error", 
+            message: "Failed to initiate secure online payment gateway." 
+        });
+    }
 });
 
 // =========================================================
