@@ -85,7 +85,7 @@ app.get('/', (req, res) => {
     res.json({
         status: "success",
         message: "GMDS Secure Backend is Live & Running! 🚀",
-        version: "2.0.2"
+        version: "2.0.3"
     });
 });
 
@@ -206,7 +206,7 @@ app.post('/api/payment/verify', async (req, res) => {
 
         console.log(`🔍 [VERIFY PAYMENT] Checking Razorpay Status for Payment ID: ${razorpayPaymentId}`);
 
-        // অপশনাল: সিকিউরিটি সিগনেচার ভেরিফিকেশন (যদি Razorpay Signature পাঠানো হয়)
+        // Optional: Security Signature Verification
         if (razorpayOrderId && razorpaySignature) {
             const generatedSignature = crypto
                 .createHmac('sha256', razorpayInstance.key_secret)
@@ -219,13 +219,13 @@ app.post('/api/payment/verify', async (req, res) => {
             }
         }
 
-        // সরাসরি Razorpay API থেকে পেমেন্ট স্ট্যাটাস ফেচ করা (Server-side check)
+        // Fetch direct status from Razorpay API
         const paymentDetails = await razorpayInstance.payments.fetch(razorpayPaymentId);
 
         if (paymentDetails && paymentDetails.status === 'captured') {
             console.log(`✅ [PAYMENT SUCCESS] Transaction ${razorpayPaymentId} is officially CAPTURED!`);
 
-            // ডাটাবেসে অর্ডার স্ট্যাটাস আপডেট করে 'Confirmed' করা
+            // Update Database to 'Confirmed'
             const updatedOrder = await Order.findOneAndUpdate(
                 { orderId: orderId },
                 { 
@@ -258,6 +258,77 @@ app.post('/api/payment/verify', async (req, res) => {
         res.status(500).json({ 
             status: "error", 
             message: "Internal server error during payment verification." 
+        });
+    }
+});
+
+// =========================================================
+// 💸 6. AUTOMATED REFUND ON CANCELLATION API
+// =========================================================
+app.post('/api/payment/refund', async (req, res) => {
+    try {
+        const { orderId } = req.body;
+
+        if (!orderId) {
+            return res.status(400).json({ status: "error", message: "Order ID is required for refund." });
+        }
+
+        console.log(`💸 [REFUND INITIATED] Processing cancellation for Order: ${orderId}`);
+
+        // ডাটাবেস থেকে অর্ডারের বিস্তারিত তথ্য খুঁজে বের করা
+        const order = await Order.findOne({ orderId: orderId });
+
+        if (!order) {
+            return res.status(404).json({ status: "error", message: "Order not found in database." });
+        }
+
+        // চেক করা অর্ডারটি অনলাইনে পেমেন্ট হয়েছিল কি না এবং পেমেন্ট আইডি আছে কি না
+        if (order.paymentMode === 'ONLINE' && order.razorpayPaymentId) {
+            try {
+                // Razorpay Refund API কল করা (Speed "optimum" মানে দ্রুত রিফান্ড হবে)
+                const refundResponse = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
+                    speed: "optimum",
+                    notes: {
+                        reason: "Customer cancelled the order within the 5-minute window."
+                    }
+                });
+
+                console.log(`✅ [REFUND SUCCESS] Refund ID: ${refundResponse.id} generated for Order: ${orderId}`);
+
+                // ডাটাবেসে স্ট্যাটাস আপডেট করা
+                order.riderStatus = 'Cancelled & Refunded';
+                await order.save();
+
+                return res.json({ 
+                    status: "success", 
+                    message: "Order cancelled and refund initiated successfully.",
+                    refundId: refundResponse.id
+                });
+
+            } catch (refundError) {
+                console.error("❌ Razorpay Refund Gateway Error:", refundError);
+                return res.status(500).json({ 
+                    status: "error", 
+                    message: "Failed to process refund from Razorpay payment gateway." 
+                });
+            }
+        } else {
+            // যদি COD হয় বা অনলাইন পেমেন্ট আইডি না থাকে, শুধু অর্ডারটি ক্যানসেল করে দেবে
+            order.riderStatus = 'Cancelled';
+            await order.save();
+            
+            console.log(`✅ [CANCEL SUCCESS] COD Order ${orderId} cancelled without refund.`);
+            return res.json({ 
+                status: "success", 
+                message: "Order cancelled successfully (No refund required for COD)." 
+            });
+        }
+
+    } catch (error) {
+        console.error("❌ Cancellation & Refund Error:", error);
+        res.status(500).json({ 
+            status: "error", 
+            message: "Internal server error during cancellation." 
         });
     }
 });
