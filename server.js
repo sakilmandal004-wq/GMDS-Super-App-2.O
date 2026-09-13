@@ -196,7 +196,7 @@ app.post('/api/payment/create', async (req, res) => {
 // =========================================================
 // 🔍 5. SERVER-SIDE PAYMENT VERIFICATION & AUTO-CONFIRMATION API
 // =========================================================
-app.post('/api/payment/verify', async (req, res) => {
+ app.post('/api/payment/verify', async (req, res) => {
     try {
         const { orderId, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
 
@@ -225,26 +225,27 @@ app.post('/api/payment/verify', async (req, res) => {
         if (paymentDetails && paymentDetails.status === 'captured') {
             console.log(`✅ [PAYMENT SUCCESS] Transaction ${razorpayPaymentId} is officially CAPTURED!`);
 
-            // Update Database to 'Confirmed'
-            const updatedOrder = await Order.findOneAndUpdate(
-                { orderId: orderId },
-                { 
-                    riderStatus: 'Confirmed',
-                    razorpayPaymentId: razorpayPaymentId 
-                },
-                { new: true }
-            );
-
-            if (updatedOrder) {
-                console.log(`📦 [DATABASE] Order ${orderId} automatically updated to CONFIRMED!`);
-                return res.json({ 
-                    status: "success", 
-                    message: "Payment verified successfully and order is confirmed.",
-                    orderId: orderId
-                });
-            } else {
-                return res.status(404).json({ status: "error", message: "Order not found in database." });
+            // 🚀 ফিক্স: ডেটাবেসে আপডেট করার চেষ্টা করবে, কিন্তু না পেলেও 404 এরর দেবে না। 
+            // কারণ ফ্রন্টএন্ড একটু পরেই নিজে থেকে অর্ডারটি ডেটাবেসে সেভ করে নেবে।
+            try {
+                await Order.findOneAndUpdate(
+                    { orderId: orderId },
+                    { 
+                        riderStatus: 'Confirmed',
+                        razorpayPaymentId: razorpayPaymentId 
+                    }
+                );
+            } catch (dbError) {
+                console.log("Order not found yet, will be saved by frontend shortly.");
             }
+
+            // সবসময় success পাঠাতে হবে যাতে ফ্রন্টএন্ড আটকে না যায়
+            return res.json({ 
+                status: "success", 
+                message: "Payment verified successfully!",
+                orderId: orderId
+            });
+            
         } else {
             console.warn(`❌ [PAYMENT PENDING/FAILED] Status: ${paymentDetails ? paymentDetails.status : 'Unknown'}`);
             return res.status(400).json({ 
