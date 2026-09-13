@@ -3,6 +3,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose'); // 📦 MongoDB Integration Library
 const Razorpay = require('razorpay'); // 💳 Razorpay Library Integration
+const crypto = require('crypto'); // 🔒 Secure signature verification library
 
 const app = express();
 
@@ -68,6 +69,8 @@ const orderSchema = new mongoose.Schema({
     paymentMode: String,
     serviceType: String,
     razorpayOrderId: String, // 💳 Track Razorpay secure order reference
+    razorpayPaymentId: String, // 🔖 Track successful transaction ID
+    riderStatus: { type: String, default: 'Pending' }, // 🚀 Order confirmation status
     timestamp: { type: Date, default: Date.now }
 });
 
@@ -82,7 +85,7 @@ app.get('/', (req, res) => {
     res.json({
         status: "success",
         message: "GMDS Secure Backend is Live & Running! 🚀",
-        version: "2.0.1"
+        version: "2.0.2"
     });
 });
 
@@ -109,10 +112,11 @@ app.post('/api/place-order', orderLimiter, async (req, res) => {
         const orderAmount = orderData.grandTotal || orderData.price || "N/A";
         const paymentMode = orderData.payMode || "Cash";
         const serviceType = orderData.type || orderData.service || 'General';
+        const initialStatus = orderData.riderStatus || (paymentMode === 'ONLINE' ? 'Payment Pending' : 'Confirmed');
 
         // Log incoming order details to the server console
         console.log(`🛒 [NEW ORDER] ID: ${orderData.orderId} | By: ${customerName}`);
-        console.log(`💰 Total: ₹${orderAmount} | Mode: ${paymentMode} | Service: ${serviceType}`);
+        console.log(`💰 Total: ₹${orderAmount} | Mode: ${paymentMode} | Status: ${initialStatus}`);
 
         // 💾 Save the order securely to MongoDB Database
         const newOrder = new Order({
@@ -122,7 +126,9 @@ app.post('/api/place-order', orderLimiter, async (req, res) => {
             orderAmount: orderAmount,
             paymentMode: paymentMode,
             serviceType: serviceType,
-            razorpayOrderId: orderData.razorpayOrderId || "N/A"
+            razorpayOrderId: orderData.razorpayOrderId || "N/A",
+            razorpayPaymentId: orderData.razorpayPaymentId || "",
+            riderStatus: initialStatus
         });
 
         await newOrder.save();
@@ -183,6 +189,75 @@ app.post('/api/payment/create', async (req, res) => {
         res.status(500).json({ 
             status: "error", 
             message: "Failed to initiate secure online payment gateway." 
+        });
+    }
+});
+
+// =========================================================
+// 🔍 5. SERVER-SIDE PAYMENT VERIFICATION & AUTO-CONFIRMATION API
+// =========================================================
+app.post('/api/payment/verify', async (req, res) => {
+    try {
+        const { orderId, razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+
+        if (!razorpayPaymentId) {
+            return res.status(400).json({ status: "error", message: "Missing payment transaction reference." });
+        }
+
+        console.log(`🔍 [VERIFY PAYMENT] Checking Razorpay Status for Payment ID: ${razorpayPaymentId}`);
+
+        // অপশনাল: সিকিউরিটি সিগনেচার ভেরিফিকেশন (যদি Razorpay Signature পাঠানো হয়)
+        if (razorpayOrderId && razorpaySignature) {
+            const generatedSignature = crypto
+                .createHmac('sha256', razorpayInstance.key_secret)
+                .update(razorpayOrderId + "|" + razorpayPaymentId)
+                .digest('hex');
+
+            if (generatedSignature !== razorpaySignature) {
+                console.warn(`⚠️ [SECURITY WARNING] Invalid Razorpay Signature for Order ID: ${orderId}`);
+                return res.status(400).json({ status: "error", message: "Payment signature verification failed." });
+            }
+        }
+
+        // সরাসরি Razorpay API থেকে পেমেন্ট স্ট্যাটাস ফেচ করা (Server-side check)
+        const paymentDetails = await razorpayInstance.payments.fetch(razorpayPaymentId);
+
+        if (paymentDetails && paymentDetails.status === 'captured') {
+            console.log(`✅ [PAYMENT SUCCESS] Transaction ${razorpayPaymentId} is officially CAPTURED!`);
+
+            // ডাটাবেসে অর্ডার স্ট্যাটাস আপডেট করে 'Confirmed' করা
+            const updatedOrder = await Order.findOneAndUpdate(
+                { orderId: orderId },
+                { 
+                    riderStatus: 'Confirmed',
+                    razorpayPaymentId: razorpayPaymentId 
+                },
+                { new: true }
+            );
+
+            if (updatedOrder) {
+                console.log(`📦 [DATABASE] Order ${orderId} automatically updated to CONFIRMED!`);
+                return res.json({ 
+                    status: "success", 
+                    message: "Payment verified successfully and order is confirmed.",
+                    orderId: orderId
+                });
+            } else {
+                return res.status(404).json({ status: "error", message: "Order not found in database." });
+            }
+        } else {
+            console.warn(`❌ [PAYMENT PENDING/FAILED] Status: ${paymentDetails ? paymentDetails.status : 'Unknown'}`);
+            return res.status(400).json({ 
+                status: "failed", 
+                message: "Payment not captured yet or transaction failed." 
+            });
+        }
+
+    } catch (error) {
+        console.error("❌ Server-Side Payment Verification Error:", error);
+        res.status(500).json({ 
+            status: "error", 
+            message: "Internal server error during payment verification." 
         });
     }
 });
