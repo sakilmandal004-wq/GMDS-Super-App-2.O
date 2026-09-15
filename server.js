@@ -266,72 +266,43 @@ app.post('/api/payment/create', async (req, res) => {
 // =========================================================
 // 💸 6. AUTOMATED REFUND ON CANCELLATION API
 // =========================================================
-
 app.post('/api/payment/refund', async (req, res) => {
     try {
         const { orderId } = req.body;
 
         if (!orderId) {
-            return res.status(400).json({ 
-                status: "error", 
-                message: "Order ID is mandatory to process the cancellation request." 
-            });
+            return res.status(400).json({ status: "error", message: "Order ID is required for refund." });
         }
 
-        console.log(`💸 [REFUND INITIATED] Processing cancellation and refund for Order ID: ${orderId}`);
+        console.log(`💸 [REFUND INITIATED] Processing cancellation for Order: ${orderId}`);
 
-        // 1. Retrieve the order record from the database
+        // ডাটাবেস থেকে অর্ডারের বিস্তারিত তথ্য খুঁজে বের করা
         const order = await Order.findOne({ orderId: orderId });
 
         if (!order) {
-            return res.status(404).json({ 
-                status: "error", 
-                message: "Requested order could not be found in the database." 
-            });
+            return res.status(404).json({ status: "error", message: "Order not found in database." });
         }
 
-        // 2. Validate payment mode and transaction reference
-        const paymentMode = order.paymentMode || order.payMode;
-        const paymentId = order.razorpayPaymentId;
-
-        if (paymentMode === 'ONLINE' && paymentId) {
+        // চেক করা অর্ডারটি অনলাইনে পেমেন্ট হয়েছিল কি না এবং পেমেন্ট আইডি আছে কি না
+        if (order.paymentMode === 'ONLINE' && order.razorpayPaymentId) {
             try {
-                // 3. Extract and normalize the total payable amount from available schema fields
-                let totalAmount = order.orderAmount || order.grandTotal || order.price || (order.details && order.details.totalFare) || 0;
-                
-                if (typeof totalAmount === 'string') {
-                    totalAmount = parseFloat(totalAmount.replace(/[^0-9.]/g, '')) || 0;
-                }
-
-                if (totalAmount <= 0) {
-                    return res.status(400).json({ 
-                        status: "error", 
-                        message: "Invalid or zero refund amount calculated for this transaction." 
-                    });
-                }
-
-                // Convert the amount to Paisa (required by Razorpay)
-                const amountInPaise = Math.round(totalAmount * 100);
-
-                // 4. Trigger the Razorpay Refund API
-                const refundResponse = await razorpayInstance.payments.refund(paymentId, {
-                    amount: amountInPaise,
+                // Razorpay Refund API কল করা (Speed "optimum" মানে দ্রুত রিফান্ড হবে)
+                const refundResponse = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
                     speed: "optimum",
                     notes: {
-                        reason: "Customer initiated order cancellation within the permissible timeframe."
+                        reason: "Customer cancelled the order within the 5-minute window."
                     }
                 });
 
-                console.log(`✅ [REFUND SUCCESS] Refund reference ID: ${refundResponse.id} successfully generated for Order ID: ${orderId}`);
+                console.log(`✅ [REFUND SUCCESS] Refund ID: ${refundResponse.id} generated for Order: ${orderId}`);
 
-                // 5. Update the order status in the database
+                // ডাটাবেসে স্ট্যাটাস আপডেট করা
                 order.riderStatus = 'Cancelled & Refunded';
-                order.status = 'Cancelled & Refunded';
                 await order.save();
 
                 return res.json({ 
                     status: "success", 
-                    message: "Order successfully cancelled and refund initiated through Razorpay.",
+                    message: "Order cancelled and refund initiated successfully.",
                     refundId: refundResponse.id
                 });
 
@@ -339,27 +310,36 @@ app.post('/api/payment/refund', async (req, res) => {
                 console.error("❌ Razorpay Refund Gateway Error:", refundError);
                 return res.status(500).json({ 
                     status: "error", 
-                    message: refundError.error?.description || "Failed to process refund through the Razorpay gateway." 
+                    message: "Failed to process refund from Razorpay payment gateway." 
                 });
             }
         } else {
-            // Handle COD or non-online orders (no payment gateway interaction required)
+            // যদি COD হয় বা অনলাইন পেমেন্ট আইডি না থাকে, শুধু অর্ডারটি ক্যানসেল করে দেবে
             order.riderStatus = 'Cancelled';
-            order.status = 'Cancelled';
             await order.save();
             
-            console.log(`✅ [CANCELLATION SUCCESS] Non-online/COD Order ID ${orderId} cancelled successfully without a refund.`);
+            console.log(`✅ [CANCEL SUCCESS] COD Order ${orderId} cancelled without refund.`);
             return res.json({ 
                 status: "success", 
-                message: "Order cancelled successfully. No refund process was required for this payment method." 
+                message: "Order cancelled successfully (No refund required for COD)." 
             });
         }
 
     } catch (error) {
-        console.error("❌ Critical Cancellation & Refund Error:", error);
-        return res.status(500).json({ 
+        console.error("❌ Cancellation & Refund Error:", error);
+        res.status(500).json({ 
             status: "error", 
-            message: "An internal server error occurred while processing the cancellation." 
+            message: "Internal server error during cancellation." 
         });
     }
+});
+
+// =========================================================
+// 🚀 START SERVER INSTANCE
+// =========================================================
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`=================================`);
+    console.log(`✅ GMDS Secure Backend running on port ${PORT}`);
+    console.log(`=================================`);
 });
