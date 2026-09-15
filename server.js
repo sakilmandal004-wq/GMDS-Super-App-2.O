@@ -55,8 +55,10 @@ app.use('/api/', globalLimiter);
 // 💾 DATABASE: MONGODB CONNECTION & SCHEMAS
 // =========================================================
 
-// Connect to MongoDB Atlas using Render Environment Variable (or fallback)
-mongoose.connect(process.env.MONGO_URI)
+// 🛠️ FIX: নিরাপদ কানেকশন স্ট্রিং (যদি Render এনভায়রনমেন্ট ভেরিয়েবল মিসিং থাকে, তবে ক্র্যাশ করবে না)
+const MONGO_URL = process.env.MONGO_URI || "mongodb+srv://sakilmandal:your_password@cluster.mongodb.net/gmds_db?retryWrites=true&w=majority";
+
+mongoose.connect(MONGO_URL)
     .then(() => console.log('✅ Connected to MongoDB Atlas successfully!'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
@@ -85,7 +87,7 @@ app.get('/', (req, res) => {
     res.json({
         status: "success",
         message: "GMDS Secure Backend is Live & Running! 🚀",
-        version: "2.0.3"
+        version: "2.0.4"
     });
 });
 
@@ -225,8 +227,6 @@ app.post('/api/payment/create', async (req, res) => {
         if (paymentDetails && paymentDetails.status === 'captured') {
             console.log(`✅ [PAYMENT SUCCESS] Transaction ${razorpayPaymentId} is officially CAPTURED!`);
 
-            // 🚀 ফিক্স: ডেটাবেসে আপডেট করার চেষ্টা করবে, কিন্তু না পেলেও 404 এরর দেবে না। 
-            // কারণ ফ্রন্টএন্ড একটু পরেই নিজে থেকে অর্ডারটি ডেটাবেসে সেভ করে নেবে।
             try {
                 await Order.findOneAndUpdate(
                     { orderId: orderId },
@@ -239,7 +239,6 @@ app.post('/api/payment/create', async (req, res) => {
                 console.log("Order not found yet, will be saved by frontend shortly.");
             }
 
-            // সবসময় success পাঠাতে হবে যাতে ফ্রন্টএন্ড আটকে না যায়
             return res.json({ 
                 status: "success", 
                 message: "Payment verified successfully!",
@@ -264,45 +263,73 @@ app.post('/api/payment/create', async (req, res) => {
 });
 
 // =========================================================
-// 💸 6. AUTOMATED REFUND ON CANCELLATION API
+// 💸 6. AUTOMATED REFUND ON CANCELLATION API (Professional Version)
 // =========================================================
 app.post('/api/payment/refund', async (req, res) => {
     try {
         const { orderId } = req.body;
 
         if (!orderId) {
-            return res.status(400).json({ status: "error", message: "Order ID is required for refund." });
+            return res.status(400).json({ 
+                status: "error", 
+                message: "Order ID is mandatory to process the cancellation request." 
+            });
         }
 
-        console.log(`💸 [REFUND INITIATED] Processing cancellation for Order: ${orderId}`);
+        console.log(`💸 [REFUND INITIATED] Processing cancellation and refund for Order ID: ${orderId}`);
 
-        // ডাটাবেস থেকে অর্ডারের বিস্তারিত তথ্য খুঁজে বের করা
+        // 1. Retrieve the order record from the database
         const order = await Order.findOne({ orderId: orderId });
 
         if (!order) {
-            return res.status(404).json({ status: "error", message: "Order not found in database." });
+            return res.status(404).json({ 
+                status: "error", 
+                message: "Requested order could not be found in the database." 
+            });
         }
 
-        // চেক করা অর্ডারটি অনলাইনে পেমেন্ট হয়েছিল কি না এবং পেমেন্ট আইডি আছে কি না
-        if (order.paymentMode === 'ONLINE' && order.razorpayPaymentId) {
+        // 2. Validate payment mode and transaction reference
+        const paymentMode = order.paymentMode || order.payMode;
+        const paymentId = order.razorpayPaymentId;
+
+        if (paymentMode === 'ONLINE' && paymentId) {
             try {
-                // Razorpay Refund API কল করা (Speed "optimum" মানে দ্রুত রিফান্ড হবে)
-                const refundResponse = await razorpayInstance.payments.refund(order.razorpayPaymentId, {
+                // 3. Extract and normalize the total payable amount from available schema fields
+                let totalAmount = order.orderAmount || order.grandTotal || order.price || 0;
+                
+                if (typeof totalAmount === 'string') {
+                    totalAmount = parseFloat(totalAmount.replace(/[^0-9.]/g, '')) || 0;
+                }
+
+                if (totalAmount <= 0) {
+                    return res.status(400).json({ 
+                        status: "error", 
+                        message: "Invalid or zero refund amount calculated for this transaction." 
+                    });
+                }
+
+                // Convert the amount to Paisa (required by Razorpay)
+                const amountInPaise = Math.round(totalAmount * 100);
+
+                // 4. Trigger the Razorpay Refund API
+                const refundResponse = await razorpayInstance.payments.refund(paymentId, {
+                    amount: amountInPaise,
                     speed: "optimum",
                     notes: {
-                        reason: "Customer cancelled the order within the 5-minute window."
+                        reason: "Customer initiated order cancellation within the permissible timeframe."
                     }
                 });
 
-                console.log(`✅ [REFUND SUCCESS] Refund ID: ${refundResponse.id} generated for Order: ${orderId}`);
+                console.log(`✅ [REFUND SUCCESS] Refund reference ID: ${refundResponse.id} successfully generated for Order ID: ${orderId}`);
 
-                // ডাটাবেসে স্ট্যাটাস আপডেট করা
+                // 5. Update the order status in the database
                 order.riderStatus = 'Cancelled & Refunded';
+                order.status = 'Cancelled & Refunded';
                 await order.save();
 
                 return res.json({ 
                     status: "success", 
-                    message: "Order cancelled and refund initiated successfully.",
+                    message: "Order successfully cancelled and refund initiated through Razorpay.",
                     refundId: refundResponse.id
                 });
 
@@ -310,26 +337,27 @@ app.post('/api/payment/refund', async (req, res) => {
                 console.error("❌ Razorpay Refund Gateway Error:", refundError);
                 return res.status(500).json({ 
                     status: "error", 
-                    message: "Failed to process refund from Razorpay payment gateway." 
+                    message: refundError.error?.description || "Failed to process refund through the Razorpay gateway." 
                 });
             }
         } else {
-            // যদি COD হয় বা অনলাইন পেমেন্ট আইডি না থাকে, শুধু অর্ডারটি ক্যানসেল করে দেবে
+            // Handle COD or non-online orders
             order.riderStatus = 'Cancelled';
+            order.status = 'Cancelled';
             await order.save();
             
-            console.log(`✅ [CANCEL SUCCESS] COD Order ${orderId} cancelled without refund.`);
+            console.log(`✅ [CANCELLATION SUCCESS] Non-online/COD Order ID ${orderId} cancelled successfully without a refund.`);
             return res.json({ 
                 status: "success", 
-                message: "Order cancelled successfully (No refund required for COD)." 
+                message: "Order cancelled successfully. No refund process was required for this payment method." 
             });
         }
 
     } catch (error) {
-        console.error("❌ Cancellation & Refund Error:", error);
-        res.status(500).json({ 
+        console.error("❌ Critical Cancellation & Refund Error:", error);
+        return res.status(500).json({ 
             status: "error", 
-            message: "Internal server error during cancellation." 
+            message: "An internal server error occurred while processing the cancellation." 
         });
     }
 });
