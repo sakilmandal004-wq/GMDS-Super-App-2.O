@@ -247,14 +247,15 @@ function pickTracking(d) {
     return {
         riderStatus: d.riderStatus || d.status || 'Pending',
         status: d.status || null,
-        riderName: d.riderName || null,
-        riderPhone: d.riderPhone || null,
+        riderName: d.riderName || d.name || null, // রাইডারের নাম নিশ্চিত করার জন্য
+        riderPhone: d.riderPhone || d.phone || null, // রাইডারের ফোন
         vehicle: d.vehicle || (d.details && d.details.vehicle) || null,
         estTime: d.estTime || null,
-        riderLat: d.riderLat || null,
-        riderLng: d.riderLng || null
+        riderLat: toNum(d.riderLat) || null,
+        riderLng: toNum(d.riderLng) || null
     };
 }
+
 async function writeTracking(dbName, orderId, record) {
     try { await getDb(dbName).ref('order_tracking/' + orderId).set({ ...pickTracking(record), updatedAt: Date.now() }); }
     catch (e) { console.error('Tracking write failed:', e.message); }
