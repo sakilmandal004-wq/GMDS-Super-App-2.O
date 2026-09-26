@@ -408,3 +408,423 @@ app.post('/api/payment/create', asyncHandler(async (req, res) => {
     const b = bodyOf(req);
     const amount = toNum(b.amount);
     const phone = cleanText(b.phone, 10);
+    const ref = cleanText(b.orderId, 40);
+    if (!(amount >= 1 && amount <= 10000)) throw httpError(400, 'Invalid payment amount specified.');
+    if (!PHONE_RE.test(phone)) throw httpError(400, 'Invalid phone number.');
+    if (ref && !/^[A-Za-z0-9_-]+$/.test(ref)) throw httpError(400, 'Invalid order reference.');
+    if (!hit('paycreate:' + phone, 10, 10 * 60 * 1000)) throw httpError(429, 'Too many payment attempts. Please wait a few minutes.');
+
+    const amountPaise = Math.round(amount * 100);
+    const rzpOrder = await razorpay.orders.create({
+        amount: amountPaise, currency: 'INR', receipt: 'rcpt_' + (ref || Date.now()), payment_capture: 1
+    });
+    await getDb('core').ref('pay_orders/' + rzpOrder.id).set({ amountPaise, phone, receipt: rzpOrder.receipt, createdAt: Date.now() });
+    console.log(`💳 [PAYMENT CREATE] ${rzpOrder.id} ₹${amount}`);
+    res.json({ status: 'success', key: RZP_KEY_ID, order_id: rzpOrder.id, amount: rzpOrder.amount, currency: rzpOrder.currency });
+}));
+
+// ---- Razorpay: verify (signature is mandatory) ----
+app.post('/api/payment/verify', asyncHandler(async (req, res) => {
+    const b = bodyOf(req);
+    const paymentId = cleanText(b.razorpayPaymentId, 40);
+    const rzpOrderId = cleanText(b.razorpayOrderId, 40);
+    const signature = cleanText(b.razorpaySignature, 100);
+    if (!PAYMENT_ID_RE.test(paymentId) || !RZP_ORDER_ID_RE.test(rzpOrderId) || !signature) {
+        throw httpError(400, 'Missing or invalid payment reference.');
+    }
+
+    const expected = crypto.createHmac('sha256', RZP_KEY_SECRET).update(rzpOrderId + '|' + paymentId).digest('hex');
+    const a = Buffer.from(expected, 'utf8'), s = Buffer.from(signature, 'utf8');
+    if (a.length !== s.length || !crypto.timingSafeEqual(a, s)) {
+        console.warn('⚠️ [SECURITY] Invalid payment signature for', rzpOrderId);
+        throw httpError(400, 'Payment signature verification failed.');
+    }
+
+    const created = (await getDb('core').ref('pay_orders/' + rzpOrderId).once('value')).val();
+    if (!created) throw httpError(400, 'Unknown payment order.');
+
+    let pay = null;
+    for (let i = 0; i < 4; i++) {
+        pay = await razorpay.payments.fetch(paymentId);
+        if (pay.status === 'captured') break;
+        if (pay.status === 'authorized' || pay.status === 'created') await sleep(1200); else break;
+    }
+    if (!pay || pay.status !== 'captured') throw httpError(400, 'Payment not captured yet or transaction failed.');
+    if (pay.order_id !== rzpOrderId) throw httpError(400, 'Payment does not match this order.');
+    if (Number(pay.amount) !== Number(created.amountPaise)) throw httpError(400, 'Payment amount mismatch.');
+
+    await getDb('core').ref('payments/' + paymentId).transaction(cur => (cur === null ? {
+        razorpayOrderId: rzpOrderId, amountPaise: Number(created.amountPaise),
+        phone: String(created.phone), verifiedAt: Date.now(), used: false
+    } : undefined));
+
+    console.log(`✅ [PAYMENT VERIFIED] ${paymentId}`);
+    res.json({ status: 'success', message: 'Payment verified successfully!' });
+}));
+
+// ---- Place order (Food / House / Seba / Delivery) ----
+async function placeFoodOrder(b, phone) {
+    const orderId = cleanText(b.orderId, 20);
+    if (!/^[0-9]{10,16}$/.test(orderId)) throw httpError(400, 'Invalid order ID.');
+    const name = cleanText(b.user || b.customer || b.name, 60) || 'Customer';
+    const address = cleanText(b.address, 300);
+    if (!address) throw httpError(400, 'Delivery address is required.');
+    const payMode = b.payMode === 'ONLINE' ? 'ONLINE' : 'COD';
+    const remote = b.remoteOrder === true;
+    let receiverPhone = 'N/A';
+    if (remote) {
+        receiverPhone = String(b.receiverPhone || '').replace(/[^0-9]/g, '');
+        if (receiverPhone.length < 10 || receiverPhone.length > 13) throw httpError(400, 'Invalid receiver phone number.');
+    }
+
+    // Prices always come from the database, never from the app
+    if (!Array.isArray(b.items) || b.items.length < 1 || b.items.length > 30) throw httpError(400, 'Your basket is empty or invalid.');
+    const wanted = new Map();
+    for (const it of b.items) {
+        const id = cleanText(it && it.id, 60);
+        const qty = Math.floor(toNum(it && it.qty));
+        if (!id || !(qty >= 1) || qty > 50) throw httpError(400, 'Invalid item in basket.');
+        wanted.set(id, (wanted.get(id) || 0) + qty);
+    }
+    const products = await getProducts();
+    const items = [];
+    let subtotal = 0;
+    for (const [id, qty] of wanted) {
+        const p = products.find(x => x && String(x.id) === id);
+        if (!p) throw httpError(400, 'An item in your basket is no longer available. Please refresh the menu.');
+        const price = toNum(p.price);
+        if (!(price > 0)) throw httpError(400, 'An item in your basket has an invalid price.');
+        const stock = parseInt(p.stock_count, 10) || 0;
+        if (stock < qty) throw httpError(409, `${cleanText(p.name, 60) || 'An item'} is out of stock.`);
+        subtotal += price * qty;
+        items.push({ ...p, qty });
+    }
+    const fee = Math.round(toNum(b.deliveryFee));
+    if (!(fee >= 10 && fee <= 100)) throw httpError(400, 'Invalid delivery charge.');
+    const total = Math.round((subtotal + fee) * 100) / 100;
+    const amountPaise = Math.round(total * 100);
+
+    let paymentId = '';
+    if (payMode === 'ONLINE') {
+        paymentId = cleanText(b.razorpayPaymentId, 40);
+        if (!PAYMENT_ID_RE.test(paymentId)) throw httpError(402, 'Online payment is not verified.');
+        await claimPayment(paymentId, phone, amountPaise, orderId);
+    }
+
+    const status = payMode === 'ONLINE' ? 'Confirmed' : 'Pending';
+    const record = {
+        orderId: Number(orderId), user: name, phone, address,
+        gpsLocation: mapsUrlOr(b.gpsLocation, 'Waiting Sync'),
+        items, subtotal, deliveryFee: fee, grandTotal: total, payMode,
+        razorpayPaymentId: paymentId, remoteOrder: remote, receiverPhone,
+        time: istNow(), riderStatus: status, status, createdAt: Date.now(), source: 'server'
+    };
+    try { await createRecord('core', 'all_orders', orderId, record); }
+    catch (e) { if (paymentId) await releasePayment(paymentId); throw e; }
+
+    await writeTracking('core', orderId, record);
+    backupOrder('food', record, total);
+    console.log(`🛒 [FOOD ORDER] ${orderId} ₹${total} ${payMode}`);
+    return { orderId: record.orderId };
+}
+
+async function placeHouseOrder(b, phone) {
+    const orderId = cleanText(b.orderId, 30);
+    if (!/^HS_[0-9]{10,16}$/.test(orderId)) throw httpError(400, 'Invalid booking ID.');
+    const service = cleanText(b.service, 80);
+    if (!service) throw httpError(400, 'Service name is required.');
+    const problem = cleanText(b.problem, 500) || 'N/A';
+    const record = {
+        orderId, customer: cleanText(b.customer || b.user || b.name, 60) || 'Customer', phone, service,
+        professional: cleanText(b.professional, 120) || 'GMDS Certified Expert', problem,
+        appointmentTime: cleanText(b.appointmentTime, 60), location: mapsUrlOr(b.location, 'Not Found'),
+        timestamp: istNow(), status: 'Confirmed', payMode: 'COD', createdAt: Date.now(), source: 'server'
+    };
+    await createRecord('house', 'house_bookings', orderId, record);
+    backupOrder('house', record, 'N/A');
+    console.log(`🔧 [HOUSE BOOKING] ${orderId}`);
+    return { orderId };
+}
+
+async function placeSebaOrder(b, phone) {
+    const orderId = cleanText(b.orderId, 30);
+    if (!/^SEBA_[0-9]{10,16}$/.test(orderId)) throw httpError(400, 'Invalid booking ID.');
+    const service = cleanText(b.service, 120);
+    if (!service) throw httpError(400, 'Service name is required.');
+    const payMode = b.payMode === 'ONLINE' ? 'ONLINE' : 'COD';
+
+    const expected = await sebaExpectedPrice(service);
+    const priceStr = expected ? '₹' + expected : 'Variable';
+
+    let paymentId = '';
+    if (payMode === 'ONLINE') {
+        if (!expected) throw httpError(400, 'Online payment is not available for this service.');
+        paymentId = cleanText(b.razorpayPaymentId, 40);
+        if (!PAYMENT_ID_RE.test(paymentId)) throw httpError(402, 'Online payment is not verified.');
+        await claimPayment(paymentId, phone, Math.round(expected * 100), orderId);
+    }
+    const record = {
+        orderId, customer: cleanText(b.customer || b.user || b.name, 60) || 'Customer', phone, service,
+        category: cleanText(b.category, 20), price: priceStr, payMode, razorpayPaymentId: paymentId,
+        location: mapsUrlOr(b.location, 'Not Shared'), timestamp: istNow(),
+        status: 'Confirmed', createdAt: Date.now(), source: 'server'
+    };
+    try { await createRecord('seba', 'seba_orders', orderId, record); }
+    catch (e) { if (paymentId) await releasePayment(paymentId); throw e; }
+    backupOrder('seba', record, priceStr);
+    console.log(`💻 [SEBA ORDER] ${orderId}`);
+    return { orderId };
+}
+
+async function placeDeliveryOrder(b, phone) {
+    const orderId = cleanText(b.orderId, 30);
+    if (!/^DEL_[0-9]{10,16}$/.test(orderId)) throw httpError(400, 'Invalid booking ID.');
+    const payMode = b.payMode === 'ONLINE' ? 'ONLINE' : 'COD';
+    const { details, fare } = buildDeliveryDetails(b.details);
+
+    let paymentId = '';
+    if (payMode === 'ONLINE') {
+        paymentId = cleanText(b.razorpayPaymentId, 40);
+        if (!PAYMENT_ID_RE.test(paymentId)) throw httpError(402, 'Online payment is not verified.');
+        await claimPayment(paymentId, phone, fare * 100, orderId);
+    }
+    const record = {
+        orderId, customer: cleanText(b.customer || b.user || b.name, 60) || 'Customer', phone,
+        price: fare, payMode, razorpayPaymentId: paymentId, details, timestamp: istNow(),
+        riderStatus: 'Confirmed', status: 'Confirmed', createdAt: Date.now(), source: 'server'
+    };
+    try { await createRecord('medicine', 'delivery_orders', orderId, record); }
+    catch (e) { if (paymentId) await releasePayment(paymentId); throw e; }
+
+    await writeTracking('medicine', orderId, record);
+    backupOrder('delivery', record, fare);
+    console.log(`🛵 [DELIVERY] ${orderId} ₹${fare} ${payMode}`);
+    return { orderId };
+}
+
+app.post('/api/place-order', orderLimiter, asyncHandler(async (req, res) => {
+    const b = bodyOf(req);
+    const phone = cleanText(b.phone, 10);
+    if (!PHONE_RE.test(phone)) throw httpError(400, 'Invalid phone number.');
+    if (!hit('order:' + phone, 5, 5 * 60 * 1000)) throw httpError(429, 'Security Lock: You are placing orders too fast. Please wait a few minutes.');
+
+    let result;
+    switch (cleanText(b.type, 20)) {
+        case 'FoodOrder':    result = await placeFoodOrder(b, phone); break;
+        case 'HouseService': result = await placeHouseOrder(b, phone); break;
+        case 'DigitalSeba':  result = await placeSebaOrder(b, phone); break;
+        case 'DeliveryRide': result = await placeDeliveryOrder(b, phone); break;
+        default: throw httpError(400, 'Unknown order type.');
+    }
+    res.json({ status: 'success', message: 'Order verified and saved successfully.', orderId: result.orderId });
+}));
+
+// =========================================================================
+// 9. ORDER HISTORY, CANCEL/REFUND, ACCOUNT DELETE
+// =========================================================================
+const CANCELLABLE = ['Pending', 'Confirmed'];
+const TERMINAL = ['Delivered', 'Completed', 'Done', 'Cancelled', 'Cancelled & Refunded'];
+
+const SERVICE_MAP = {
+    food: {
+        db: 'core', path: 'all_orders', idRe: /^[0-9]{10,16}$/, win: 300, statusKey: 'riderStatus', both: true,
+        nameKey: 'user', wipe: ['address', 'gpsLocation', 'receiverPhone'], nullify: [],
+        shape: (o, key) => ({
+            type: 'food', serviceType: 'food', dbPath: 'all_orders',
+            rawId: o.orderId || key, orderId: o.orderId || key, time: o.time || 'N/A', rawTimestamp: orderTs(o, key),
+            items: Array.isArray(o.items) ? o.items : (o.items ? Object.values(o.items) : []),
+            subtotal: o.subtotal || 0, deliveryFee: o.deliveryFee || 0, grandTotal: o.grandTotal || 0,
+            payMode: o.payMode || 'COD', razorpayPaymentId: o.razorpayPaymentId || '',
+            status: o.riderStatus || o.status || 'Pending'
+        })
+    },
+    delivery: {
+        db: 'medicine', path: 'delivery_orders', idRe: /^DEL_[0-9]{10,16}$/, win: 300, statusKey: 'riderStatus', both: true,
+        nameKey: 'customer', wipe: ['details/pickup', 'details/drop', 'details/receiverPhone'],
+        nullify: ['details/pickupLat', 'details/pickupLng', 'details/dropLat', 'details/dropLng'],
+        shape: (o, key) => {
+            const d = o.details || {};
+            const isRide = d.type === 'Ride Booking';
+            return {
+                type: 'delivery', serviceType: 'delivery', dbPath: 'delivery_orders',
+                rawId: o.orderId || key, rawTimestamp: orderTs(o, key), orderId: o.orderId || key,
+                title: isRide ? `Ride Booking (${d.vehicle || 'Bike'})` : `Parcel Delivery (${d.itemName || 'Item'})`,
+                pickup: d.pickup || 'N/A', drop: d.drop || 'N/A', distance: d.distance || 'N/A',
+                time: o.timestamp || 'N/A', price: '₹' + (d.totalFare || 0),
+                payMode: o.payMode || 'COD', razorpayPaymentId: o.razorpayPaymentId || '',
+                status: o.riderStatus || o.status || 'Pending', details: d,
+                icon: isRide ? 'fa-motorcycle' : 'fa-box-open', iconColor: 'text-blue-600', iconBg: 'bg-blue-50'
+            };
+        }
+    },
+    house: {
+        db: 'house', path: 'house_bookings', idRe: /^HS_[0-9]{10,16}$/, win: 900, statusKey: 'status', both: false,
+        nameKey: 'customer', wipe: ['location', 'problem'], nullify: [],
+        shape: (o, key) => ({
+            type: 'house', serviceType: 'house', dbPath: 'house_bookings',
+            rawId: o.orderId || key, rawTimestamp: orderTs(o, key), orderId: o.orderId || key,
+            title: o.service || 'House Help Service',
+            details: o.problem && o.problem !== 'N/A' ? o.problem : '',
+            professional: o.professional || 'GMDS Expert', time: o.appointmentTime || o.timestamp || 'N/A',
+            price: 'Expert: ' + (o.professional || 'GMDS Expert'),
+            payMode: o.payMode || 'COD', razorpayPaymentId: o.razorpayPaymentId || '',
+            status: o.status || 'Confirmed',
+            icon: 'fa-tools', iconColor: 'text-orange-600', iconBg: 'bg-orange-50'
+        })
+    },
+    seba: {
+        db: 'seba', path: 'seba_orders', idRe: /^SEBA_[0-9]{10,16}$/, win: 300, statusKey: 'status', both: false,
+        nameKey: 'customer', wipe: ['location'], nullify: [],
+        shape: (o, key) => ({
+            type: 'seba', serviceType: 'seba', dbPath: 'seba_orders',
+            rawId: o.orderId || key, rawTimestamp: orderTs(o, key), orderId: o.orderId || key,
+            title: o.service || 'Digital Seba Portal', time: o.timestamp || 'N/A',
+            price: 'Charge: ' + (o.price || 'Variable'),
+            payMode: o.payMode || 'COD', razorpayPaymentId: o.razorpayPaymentId || '',
+            status: o.status || 'Pending',
+            icon: 'fa-laptop-code', iconColor: 'text-purple-600', iconBg: 'bg-purple-50'
+        })
+    }
+};
+
+// ---- My orders ----
+app.post('/api/my-orders', asyncHandler(async (req, res) => {
+    const phone = cleanText(bodyOf(req).phone, 10);
+    if (!PHONE_RE.test(phone)) throw httpError(400, 'Invalid phone number.');
+    if (!hit('orders:' + phone, 20, 60 * 1000)) throw httpError(429, 'Too many requests. Please wait a moment.');
+
+    const jobs = Object.entries(SERVICE_MAP).map(async ([kind, cfg]) => {
+        const db = dbs[cfg.db];
+        if (!db) return [];
+        const snap = await db.ref(cfg.path).orderByChild('phone').equalTo(phone).limitToLast(50).once('value');
+        const out = [];
+        snap.forEach(child => {
+            try { out.push(cfg.shape(child.val() || {}, child.key)); } catch (e) { console.error('Shape error', kind, e.message); }
+        });
+        return out;
+    });
+    const results = await Promise.all(jobs.map(p => p.catch(e => { console.error('History query failed:', e.message); return []; })));
+    const orders = [].concat(...results).sort((a, b) => b.rawTimestamp - a.rawTimestamp);
+    res.json({ status: 'success', orders });
+}));
+
+// ---- Cancel (+ automatic refund for online payments) ----
+app.post('/api/order/cancel', asyncHandler(async (req, res) => {
+    const b = bodyOf(req);
+    const cfg = SERVICE_MAP[cleanText(b.serviceType, 10)];
+    if (!cfg) throw httpError(400, 'Invalid service type.');
+    const orderId = cleanText(b.orderId, 30);
+    if (!cfg.idRe.test(orderId)) throw httpError(400, 'Invalid order ID.');
+    const phone = cleanText(b.phone, 10);
+    if (!PHONE_RE.test(phone)) throw httpError(400, 'Invalid phone number.');
+    if (!hit('cancel:' + phone, 10, 10 * 60 * 1000)) throw httpError(429, 'Too many requests. Please wait a few minutes.');
+
+    const orderRef = getDb(cfg.db).ref(`${cfg.path}/${orderId}`);
+    const snap = await orderRef.once('value');
+    if (!snap.exists()) throw httpError(404, 'Order not found.');
+    const order = snap.val();
+    if (String(order.phone) !== phone) throw httpError(403, 'This order does not belong to your account.');
+
+    const createdAt = orderTs(order, orderId);
+    if (Date.now() - createdAt > (cfg.win + 10) * 1000) throw httpError(400, 'The cancellation time window for this order has closed.');
+
+    // Atomically claim the cancellation (blocks a race with the rider accepting the order)
+    let prevStatus = 'Confirmed';
+    const tx = await orderRef.transaction(cur => {
+        if (cur === null) return cur; // retried by Firebase with the real data
+        if (String(cur.phone) !== phone) return; // abort
+        const eff = cur[cfg.statusKey] || cur.status || cur.riderStatus || 'Confirmed';
+        if (!CANCELLABLE.includes(eff)) return; // abort
+        prevStatus = eff;
+        cur[cfg.statusKey] = 'Cancelling';
+        return cur;
+    });
+    if (!tx.committed || !tx.snapshot.exists()) throw httpError(409, 'This order can no longer be cancelled (it is already being processed).');
+
+    const paymentId = order.razorpayPaymentId;
+    const online = order.payMode === 'ONLINE' && paymentId;
+    let refundId = null;
+    try {
+        if (online) {
+            const r = await refundPaymentFully(paymentId, 'Customer cancelled order ' + orderId);
+            refundId = r.refundId;
+            try { await getDb('core').ref('payments/' + paymentId + '/refundState').set({ refundId, at: Date.now(), reason: 'customer_cancel' }); } catch (e) { /* non-critical */ }
+        }
+    } catch (e) {
+        console.error('❌ Refund failed for', orderId, e.error ? JSON.stringify(e.error) : e.message);
+        try { await orderRef.update({ [cfg.statusKey]: prevStatus }); } catch (e2) { console.error('❌ Could not restore status for', orderId); }
+        throw httpError(502, 'The refund could not be processed right now. Your order is unchanged. Please try again or contact support.');
+    }
+
+    const finalStatus = online ? 'Cancelled & Refunded' : 'Cancelled';
+    const upd = { status: finalStatus, cancelledAt: Date.now() };
+    if (cfg.both) upd.riderStatus = finalStatus;
+    if (refundId) upd.refundId = refundId;
+    try { await orderRef.update(upd); }
+    catch (e) { await sleep(500); await orderRef.update(upd); }
+
+    if (OrderBackup && mongoose.connection.readyState === 1) {
+        OrderBackup.updateOne({ orderId: String(orderId) }, { riderStatus: finalStatus }).catch(() => {});
+    }
+    console.log(`🚫 [CANCELLED] ${orderId} -> ${finalStatus}`);
+    res.json({ status: 'success', refunded: !!online, refundId, message: 'Order cancelled successfully.' });
+}));
+
+// ---- Delete account: personal data is wiped; finished orders are anonymised (accounting records stay) ----
+app.post('/api/account/delete', asyncHandler(async (req, res) => {
+    const phone = cleanText(bodyOf(req).phone, 10);
+    if (!PHONE_RE.test(phone)) throw httpError(400, 'Invalid phone number.');
+    if (!hit('delete:' + phone, 3, 24 * 3600 * 1000)) throw httpError(429, 'Too many requests. Please try again tomorrow.');
+
+    let anonymised = 0, keptActive = 0;
+    for (const cfg of Object.values(SERVICE_MAP)) {
+        const db = dbs[cfg.db];
+        if (!db) continue;
+        const snap = await db.ref(cfg.path).orderByChild('phone').equalTo(phone).once('value');
+        const updates = {};
+        snap.forEach(child => {
+            const o = child.val() || {};
+            const eff = o.riderStatus || o.status || '';
+            if (!TERMINAL.includes(eff)) { keptActive++; return; }
+            const k = child.key;
+            updates[k + '/' + cfg.nameKey] = 'Deleted User';
+            updates[k + '/phone'] = 'DELETED';
+            cfg.wipe.forEach(f => { updates[k + '/' + f] = 'DELETED'; });
+            cfg.nullify.forEach(f => { updates[k + '/' + f] = null; });
+            anonymised++;
+        });
+        if (Object.keys(updates).length) await db.ref(cfg.path).update(updates);
+    }
+    await getDb('core').ref('gmds_records/' + phone).remove();
+    if (dbs.seba) await dbs.seba.ref('fcm_tokens/' + phone).remove();
+    if (OrderBackup && mongoose.connection.readyState === 1) {
+        OrderBackup.updateMany({ phone }, { customerName: 'Deleted User', phone: 'DELETED' }).catch(() => {});
+    }
+    console.log(`🗑️ [ACCOUNT DELETE] anonymised=${anonymised} keptActive=${keptActive}`);
+    res.json({ status: 'success', message: 'Your personal data has been deleted.', anonymisedOrders: anonymised, activeOrdersKept: keptActive });
+}));
+
+// =========================================================================
+// 10. ERROR HANDLING & START
+// =========================================================================
+app.use((req, res) => res.status(404).json({ status: 'error', message: 'Route not found.' }));
+app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
+    if (err && err.type === 'entity.parse.failed') return res.status(400).json({ status: 'error', message: 'Invalid JSON.' });
+    if (err && err.message === 'Not allowed by CORS') return res.status(403).json({ status: 'error', message: 'Origin not allowed.' });
+    const status = (err && err.status >= 400 && err.status < 600) ? err.status : 500;
+    if (status >= 500) console.error('❌', err);
+    res.status(status).json({ status: 'error', message: (status < 500 || (err && err.expose)) ? err.message : 'Internal server error.' });
+});
+
+process.on('unhandledRejection', r => console.error('⚠️ Unhandled rejection:', r));
+process.on('uncaughtException', e => console.error('⚠️ Uncaught exception:', e));
+
+mirrorTracking('core', 'all_orders');
+mirrorTracking('medicine', 'delivery_orders');
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log('=================================');
+    console.log(`✅ GMDS Secure Backend v3.0.0 running on port ${PORT}`);
+    console.log('=================================');
+});
