@@ -822,7 +822,7 @@ process.on('uncaughtException', e => console.error('⚠️ Uncaught exception:',
 mirrorTracking('core', 'all_orders');
 mirrorTracking('medicine', 'delivery_orders');
 
-require('./admin-routes')(app, dbs);
+require('./admin-routes')(app, { core: coreDb, med: medDb, house: houseDb, seba: sebaDb });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
