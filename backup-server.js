@@ -374,18 +374,21 @@ app.use((err, req, res, next) => {
     });
 });
 
-const server = app.listen(PORT, () => {
+const PORT = process.env.PORT || 5001; // বা দ্বিতীয় সার্ভারের জন্য 5002
+
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('========================================');
     console.log('GMDS SECONDARY BACKUP SERVER v2.0.0');
     console.log(`Listening on port ${PORT}`);
     console.log('========================================');
 });
 
+// গ্লোবাল এরর হ্যান্ডলিং ও আনহ্যান্ডেলড রিজেকশন ঠিকঠাক রাখা হলো
 process.on('unhandledRejection', err => {
-    console.error('Unhandled rejection:', err);
+    console.error('Unhandled rejection:', err.message || err);
 });
 
 process.on('uncaughtException', err => {
-    console.error('Uncaught exception:', err);
+    console.error('Uncaught exception:', err.message || err);
     server.close(() => process.exit(1));
 });
