@@ -1,7 +1,6 @@
-
 {
   "name": "gmds-multi-server-security-system",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "private": true,
   "description": "GMDS Multi-Server Backend, Backup, Recovery and Security Gateway",
   "main": "server.js",
@@ -25,6 +24,7 @@
   "author": "Sakil Mandal | GMDS Group",
   "license": "ISC",
   "dependencies": {
+    "@upstash/redis": "^1.34.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
