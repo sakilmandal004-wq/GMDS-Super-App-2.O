@@ -778,25 +778,49 @@ async function sendTelegramZoneAlert(order, fallbackId = '') {
     }
 }
 
-function startRealtimeOrderWatchers() {
-    const bootTime = Date.now();
+function watchDatabaseNode(dbInstance, nodePath, label) {
+    if (!dbInstance) return;
+    let initialLoaded = false;
 
-    const handler = (snap) => {
+    dbInstance.ref(nodePath).once('value').then(snap => {
+        const existing = snap.val() || {};
+        Object.keys(existing).forEach(key => {
+            const o = existing[key];
+            const oId = String((o && (o.orderId || o.id)) || key);
+            markNotified(oId);
+            markNotified(key);
+        });
+        initialLoaded = true;
+        console.log(`✅ [${label}] Baseline synced (${Object.keys(existing).length} existing). Listening for NEW orders...`);
+    }).catch(err => {
+        console.error(`❌ [${label}] Baseline sync error:`, err.message);
+        initialLoaded = true;
+    });
+
+    dbInstance.ref(nodePath).on('child_added', snap => {
+        if (!initialLoaded) return;
+
         const o = snap.val();
         if (!o || typeof o !== 'object') return;
-        const oId = String(o.orderId || o.id || snap.key);
-        if (!oId || notifiedOrders.has(oId)) return;
+
+        const key = String(snap.key);
+        const oId = String(o.orderId || o.id || key);
+
+        if (notifiedOrders.has(oId) || notifiedOrders.has(key)) return;
         markNotified(oId);
+        markNotified(key);
 
-        const ts = Number(o.createdAt) || Number(snap.key) || 0;
-        if (ts >= bootTime - 15000) {
-            sendNtfyOrderAlert(o, snap.key).catch(() => {});
-            sendTelegramZoneAlert(o, snap.key).catch(() => {});
-        }
-    };
+        console.log(`🆕 [${label}] New order detected: #${oId}`);
+        sendNtfyOrderAlert(o, key).catch(() => {});
+        sendTelegramZoneAlert(o, key).catch(() => {});
+    }, err => {
+        console.error(`❌ [${label}] Listener error:`, err.message);
+    });
+}
 
-    if (backupDb) backupDb.ref('all_orders').limitToLast(20).on('child_added', handler);
-    if (riderDb) riderDb.ref('delivery_orders').limitToLast(20).on('child_added', handler);
+function startRealtimeOrderWatchers() {
+    watchDatabaseNode(backupDb, 'all_orders', 'CORE_DB');
+    watchDatabaseNode(riderDb, 'delivery_orders', 'RIDER_DB');
     console.log(`👀 Realtime order watchers active (ntfy ${NTFY_ENABLED ? 'ON' : 'OFF'}, telegram ${TELEGRAM_BOT_TOKEN ? 'ON' : 'OFF'})`);
 }
 
